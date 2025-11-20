@@ -106,25 +106,26 @@ operation/
 └── src/main/java/doda25/team23/VersionUtil.java
 ```
 
-## Key Files for Understanding the Codebase
+## Key Repositories for Understanding the Codebase
 
-### Configuration Files
-- [`docker-compose.yml`](docker-compose.yml) - Service orchestration and networking
-- [`../app/pom.xml`](../app/pom.xml) - Frontend dependencies
-- [`../model-service/requirements.txt`](../model-service/requirements.txt) - Backend dependencies
+### Frontend Service
+- **Repository**: https://github.com/doda25-team23/app
+- **Technology**: Java 25, Spring Boot 3.5.7
+- **Key components**: Controllers, Thymeleaf templates, REST client
 
-### Frontend
-- [`../app/src/main/java/frontend/ctrl/FrontendController.java`](../app/src/main/java/frontend/ctrl/FrontendController.java) - Main controller handling SMS classification
-- [`../app/src/main/resources/templates/sms/index.html`](../app/src/main/resources/templates/sms/index.html) - Web UI
+### Backend Service
+- **Repository**: https://github.com/doda25-team23/model-service
+- **Technology**: Python 3.12, Flask, scikit-learn
+- **Key components**: ML pipeline, preprocessing, model training, API server
 
-### Backend
-- [`../model-service/src/serve_model.py`](../model-service/src/serve_model.py) - Flask API serving predictions
-- [`../model-service/src/text_classification.py`](../model-service/src/text_classification.py) - Model training logic
-- [`../model-service/src/text_preprocessing.py`](../model-service/src/text_preprocessing.py) - Text preprocessing pipeline
+### Version Library
+- **Repository**: https://github.com/doda25-team23/lib-version
+- **Technology**: Java, Maven
+- **Purpose**: Version awareness utility for applications
 
-### Deployment
-- [`../app/Dockerfile`](../app/Dockerfile) - Frontend container image
-- [`../model-service/Dockerfile`](../model-service/Dockerfile) - Backend container image
+### Operations
+- **Repository**: https://github.com/doda25-team23/operation
+- **Purpose**: Docker Compose, deployment configurations, and operational scripts
 
 ## Container Images
 
