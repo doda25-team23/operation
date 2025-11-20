@@ -23,23 +23,28 @@ docker-compose --version
 
 ## How to Start the Application
 
-### 1. Navigate to operation directory
+### Option 1: Using Pre-built Images (Recommended)
+
 ```bash
 cd operation
-```
-
-### 2. Start all services
-```bash
+docker-compose pull  # Pull latest images from GitHub Container Registry
 docker-compose up -d
 ```
 
+### Option 2: Building Locally
+
+```bash
+cd operation
+docker-compose up -d --build
+```
+
 This will:
-- Build Docker images for both services
+- Build Docker images for both services (or pull from registry if available)
 - Download the SMS dataset
 - Train the ML model
 - Start both services
 
-**Note**: First startup takes 5-10 minutes for model training.
+**Note**: Local builds take 5-10 minutes for model training.
 
 ### 3. Access the application
 - **Web UI**: http://localhost:8080/sms
@@ -120,6 +125,37 @@ operation/
 ### Deployment
 - [`../app/Dockerfile`](../app/Dockerfile) - Frontend container image
 - [`../model-service/Dockerfile`](../model-service/Dockerfile) - Backend container image
+
+## Container Images
+
+Published container images are available on GitHub Container Registry:
+
+- **Frontend**: `ghcr.io/doda25-team23/app:latest`
+- **Backend**: `ghcr.io/doda25-team23/model-service:latest`
+
+### Versioning
+
+- **app**: Version automatically extracted from `pom.xml` on every push to main/master
+- **model-service**: Version determined by git tags (format: `v1.0.0`)
+
+### Triggering Releases
+
+**Frontend (app)**:
+```bash
+cd app
+git add .
+git commit -m "Update application"
+git push origin master
+# Workflow automatically triggers and builds image with version from pom.xml
+```
+
+**Backend (model-service)**:
+```bash
+cd model-service
+git tag v1.0.0
+git push origin v1.0.0
+# Workflow automatically triggers and builds image with tag version
+```
 
 ## Future Additions
 
