@@ -1,0 +1,42 @@
+services:
+  model-service:
+    build:
+      context: ../model-service
+      dockerfile: Dockerfile
+    container_name: sms-model-service
+    ports:
+      - "8081:8081"
+    networks:
+      - sms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/apidocs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../app
+      dockerfile: Dockerfile
+    container_name: sms-frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - MODEL_HOST=http://model-service:8081
+    networks:
+      - sms-network
+    depends_on:
+      - model-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  sms-network:
+    driver: bridge
