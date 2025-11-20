@@ -1,5 +1,6 @@
 services:
   model-service:
+    image: ghcr.io/doda25-team23/model-service:latest
     build:
       context: ../model-service
       dockerfile: Dockerfile
@@ -17,6 +18,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ghcr.io/doda25-team23/app:latest
     build:
       context: ../app
       dockerfile: Dockerfile
