@@ -1,0 +1,10 @@
+---
+#Task B
+
+- name: Kubernetes Controller Setup
+  hosts: ctrl
+  become: yes
+  tasks:
+    - name: Placeholder - Replace with actual implementation
+      ansible.builtin.debug:
+        msg: "Controller setup tasks go here"
