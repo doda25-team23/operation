@@ -1,0 +1,10 @@
+---
+#Task B
+
+- name: Kubernetes Cluster Finalization
+  hosts: ctrl
+  become: yes
+  tasks:
+    - name: Placeholder - Replace with actual implementation
+      ansible.builtin.debug:
+        msg: "Finalization tasks go here"
