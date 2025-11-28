@@ -12,9 +12,11 @@ This guide explains how to bring up the Vagrant-based Kubernetes lab environment
 ## Provisioning Workflow
 
 1. **Boot the VMs**
+
    ```bash
    vagrant up
    ```
+
    This creates the controller (`ctrl`) and worker nodes (`node-1`, `node-2`) with the networking, SSH keys, container runtime, kubeadm, etc. already configured.
 
 2. **Run the finalization playbook (once the nodes are `Ready`)**
@@ -49,24 +51,24 @@ This guide explains how to bring up the Vagrant-based Kubernetes lab environment
 
 Edit the variables at the top of `Vagrantfile` to tune resources:
 
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `NUM_WORKERS` | Number of worker nodes | `2` |
-| `CTRL_CPUS`, `CTRL_MEMORY` | Controller vCPU / RAM | `1`, `4096` |
-| `WORKER_CPUS`, `WORKER_MEMORY` | Worker vCPU / RAM | `2`, `6144` |
+| Variable                       | Purpose                | Default     |
+| ------------------------------ | ---------------------- | ----------- |
+| `NUM_WORKERS`                  | Number of worker nodes | `2`         |
+| `CTRL_CPUS`, `CTRL_MEMORY`     | Controller vCPU / RAM  | `1`, `4096` |
+| `WORKER_CPUS`, `WORKER_MEMORY` | Worker vCPU / RAM      | `2`, `6144` |
 
 ## Network Plan
 
-| Host | IP | Notes |
-| --- | --- | --- |
-| ctrl | `192.168.56.100` | Control-plane endpoint |
-| node-1 | `192.168.56.101` | Worker |
-| node-2 | `192.168.56.102` | Worker |
+| Host         | IP                            | Notes                     |
+| ------------ | ----------------------------- | ------------------------- |
+| ctrl         | `192.168.56.100`              | Control-plane endpoint    |
+| node-1       | `192.168.56.101`              | Worker                    |
+| node-2       | `192.168.56.102`              | Worker                    |
 | MetalLB pool | `192.168.56.90-192.168.56.99` | Ingress / Istio addresses |
 
 Private IPs are reachable directly from the host (VirtualBox host-only network). No port forwards are required.
 
-## What Person D’s Playbook Installs
+## What finalization’s Playbook Installs
 
 Running `finalization.yml` performs the following idempotent steps on the controller node:
 
