@@ -6,7 +6,7 @@ This directory contains the infrastructure-as-code for provisioning a Kubernetes
 
 - Vagrant
 - VirtualBox
-- Ansible (for local provisioning)
+- **No Ansible installation required!** (Ansible automatically installs inside VMs using `ansible_local`)
 
 ## Quick Start
 
