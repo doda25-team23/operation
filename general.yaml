@@ -1,9 +1,213 @@
 ---
-#Task B
-- name: General Kubernetes Setup
+- name: Base system setup for all nodes
   hosts: all
   become: yes
+
+  vars:
+    ssh_keys_dir: "{{ playbook_dir }}/ansible/files/ssh_keys"
+    hosts_file_src: "{{ playbook_dir }}/ansible/files/hosts"
+
   tasks:
-    - name: Placeholder - Replace with actual implementation
-      ansible.builtin.debug:
-        msg: "General setup tasks go here"
+
+    ####################################################################
+    # 1) Debug - show which host we are configuring
+    ####################################################################
+    - name: Debug - current host
+      debug:
+        msg: "Configuring base system on {{ inventory_hostname }}"
+
+    ####################################################################
+    # 2) Ensure /home/vagrant/.ssh exists
+    ####################################################################
+    - name: Ensure .ssh directory exists for vagrant
+      file:
+        path: /home/vagrant/.ssh
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0700"
+
+    ####################################################################
+    # 3) Add all team SSH public keys
+    ####################################################################
+    - name: Add team SSH public keys to vagrant user
+      authorized_key:
+        user: vagrant
+        state: present
+        key: "{{ lookup('file', item) }}"
+      loop: "{{ lookup('fileglob', ssh_keys_dir + '/*.pub', wantlist=True) }}"
+
+    ####################################################################
+    # 4) Disable swap immediately (required for Kubernetes)
+    ####################################################################
+    - name: Disable all swap immediately
+      command: swapoff -a
+      when: ansible_swaptotal_mb | default(0) > 0
+
+    ####################################################################
+    # 5) Comment out swap entries in /etc/fstab so swap stays disabled
+    ####################################################################
+    - name: Disable swap permanently in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^(.*\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    ####################################################################
+    # 6) Copy /etc/hosts for cluster hostname resolution
+    ####################################################################
+    - name: Install shared /etc/hosts file
+      copy:
+        src: "{{ hosts_file_src }}"
+        dest: /etc/hosts
+        owner: root
+        group: root
+        mode: "0644"
+
+    ####################################################################
+    # 7) Ensure required kernel modules are loaded (overlay, br_netfilter)
+    ####################################################################
+    - name: Ensure overlay kernel module is loaded
+      modprobe:
+        name: overlay
+        state: present
+
+    - name: Ensure br_netfilter kernel module is loaded
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Persist kernel modules across reboots
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+        owner: root
+        group: root
+        mode: "0644"
+
+    ####################################################################
+    # 8) Sysctl settings required by Kubernetes networking
+    ####################################################################
+    - name: Ensure net.ipv4.ip_forward is enabled
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        reload: yes
+
+    - name: Ensure net.bridge.bridge-nf-call-iptables is enabled
+      sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: "1"
+        state: present
+        reload: yes
+
+    - name: Ensure net.bridge.bridge-nf-call-ip6tables is enabled
+      sysctl:
+        name: net.bridge.bridge-nf-call-ip6tables
+        value: "1"
+        state: present
+        reload: yes
+
+    ####################################################################
+    # 9) Add Kubernetes apt repository
+    ####################################################################
+    - name: Install apt-transport-https and curl
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Add Kubernetes apt GPG key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes apt repository
+      apt_repository:
+        repo: "deb https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
+        state: present
+        filename: kubernetes
+
+    ####################################################################
+    # 10) Install container runtime and Kubernetes tools
+    ####################################################################
+    - name: Install containerd, runc, kubeadm, kubelet, kubectl
+      apt:
+        name:
+          - containerd
+          - runc
+          - kubeadm=1.32.4-*
+          - kubelet=1.32.4-*
+          - kubectl=1.32.4-*
+        state: present
+        update_cache: yes
+
+    ####################################################################
+    # 11) Configure containerd for Kubernetes
+    ####################################################################
+    - name: Ensure containerd config directory exists
+      file:
+        path: /etc/containerd
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Generate default containerd config if missing
+      command: containerd config default
+      args:
+        creates: /etc/containerd/config.toml
+      register: containerd_config_gen
+      changed_when: containerd_config_gen.rc == 0
+      notify: Restart containerd
+
+    - name: Write generated containerd config to file (first run only)
+      copy:
+        dest: /etc/containerd/config.toml
+        content: "{{ containerd_config_gen.stdout }}"
+      when: containerd_config_gen.stdout is defined
+      notify: Restart containerd
+
+    # Disable AppArmor and set pause image + SystemdCgroup
+    - name: Ensure sandbox_image is set correctly
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '^\s*sandbox_image = .*$'
+        replace: '    sandbox_image = "registry.k8s.io/pause:3.10"'
+      notify: Restart containerd
+
+    - name: Ensure disable_apparmor is set to true
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '^\s*disable_apparmor = .*$'
+        replace: '    disable_apparmor = true'
+      notify: Restart containerd
+
+    - name: Ensure SystemdCgroup is set to true for runc
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '^\s*SystemdCgroup = .*$'
+        replace: '            SystemdCgroup = true'
+      notify: Restart containerd
+
+    ####################################################################
+    # 12) Ensure kubelet is enabled and started
+    ####################################################################
+    - name: Ensure kubelet service is enabled and started
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart containerd
+      service:
+        name: containerd
+        state: restarted
+        enabled: yes
