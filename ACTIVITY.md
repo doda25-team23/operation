@@ -20,7 +20,7 @@ Created Docker compose setup in operation repository. The .yml file orchestrates
 ### Radu
 
 ### Ocean
-
+VM insfrastructure setup, Vagrantfile that provisions 1 control node and 2 worker nodes running Ubuntu 24.04. Setup includes NAT and host-only networking, has local ansible provisioners for cross-platform, a shared folder for kubeconfig export, and placeholder Ansible playbooks for Radu to work in. Added my SSH key to folder. .
 
 
 
