@@ -1,10 +1,47 @@
 ---
-#Task B
-
 - name: Kubernetes Worker Node Setup
   hosts: nodes
   become: yes
+
   tasks:
-    - name: Placeholder - Replace with actual implementation
-      ansible.builtin.debug:
-        msg: "Worker node setup tasks go here "
+    # Check if already joined
+    - name: Check if node is already part of a cluster
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf_check
+
+    # Wait for join command
+    - name: Wait for join command file to be created by controller
+      wait_for:
+        path: /vagrant/kubeconfig/join-command.sh
+        state: present
+        timeout: 300
+      when: not kubelet_conf_check.stat.exists
+
+    # Execute join command
+    - name: Read join command from shared folder
+      slurp:
+        src: /vagrant/kubeconfig/join-command.sh
+      register: join_command_content
+      when: not kubelet_conf_check.stat.exists
+
+    - name: Join worker node to Kubernetes cluster
+      command: "{{ join_command_content.content | b64decode | trim }}"
+      when: not kubelet_conf_check.stat.exists
+      register: join_output
+
+    - name: Display join output
+      debug:
+        var: join_output.stdout_lines
+      when: join_output is defined and join_output.changed
+
+    # Verify join
+    - name: Verify kubelet.conf was created
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: verify_join
+
+    - name: Confirm node has joined the cluster
+      debug:
+        msg: "Node successfully joined the Kubernetes cluster"
+      when: verify_join.stat.exists

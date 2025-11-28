@@ -1,10 +1,132 @@
 ---
-#Task B
-
 - name: Kubernetes Controller Setup
   hosts: ctrl
   become: yes
+
   tasks:
-    - name: Placeholder - Replace with actual implementation
-      ansible.builtin.debug:
-        msg: "Controller setup tasks go here"
+    # Check if cluster is already initialized
+    - name: Check if Kubernetes cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_init_check
+
+    # Initialize cluster
+    - name: Initialize Kubernetes cluster on controller
+      command: >
+        kubeadm init
+        --apiserver-advertise-address=192.168.56.100
+        --pod-network-cidr=10.244.0.0/16
+        --control-plane-endpoint=ctrl
+      when: not kubeadm_init_check.stat.exists
+      register: kubeadm_init_output
+
+    - name: Display kubeadm init output
+      debug:
+        var: kubeadm_init_output.stdout_lines
+      when: kubeadm_init_output is defined and kubeadm_init_output.changed
+
+    # Configure kubeconfig for vagrant user
+    - name: Create .kube directory for vagrant user
+      file:
+        path: /home/vagrant/.kube
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Copy admin.conf to vagrant user's kubeconfig
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/vagrant/.kube/config
+        owner: vagrant
+        group: vagrant
+        mode: "0600"
+        remote_src: yes
+
+    # Export kubeconfig to host
+    - name: Create kubeconfig directory in shared folder
+      file:
+        path: /vagrant/kubeconfig
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Copy kubeconfig to shared folder
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /vagrant/kubeconfig/config
+        owner: vagrant
+        group: vagrant
+        mode: "0600"
+        remote_src: yes
+
+    # Install Flannel CNI
+    - name: Create directory for Flannel manifest
+      file:
+        path: /home/vagrant/k8s-manifests
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Download Flannel manifest
+      get_url:
+        url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+        dest: /home/vagrant/k8s-manifests/kube-flannel.yml
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Modify Flannel to use eth1 interface
+      replace:
+        path: /home/vagrant/k8s-manifests/kube-flannel.yml
+        regexp: '(\s+)- --ip-masq'
+        replace: '\1- --ip-masq\n\1- --iface=eth1'
+
+    - name: Apply Flannel CNI
+      become_user: vagrant
+      command: kubectl apply -f /home/vagrant/k8s-manifests/kube-flannel.yml
+      environment:
+        KUBECONFIG: /home/vagrant/.kube/config
+      register: flannel_apply
+      changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
+
+    # Install Helm
+    - name: Download Helm installation script
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: "0700"
+
+    - name: Install Helm
+      command: /tmp/get_helm.sh
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Verify Helm installation
+      command: helm version
+      register: helm_version
+      changed_when: false
+
+    - name: Display Helm version
+      debug:
+        var: helm_version.stdout
+
+    # Generate join command for workers
+    - name: Generate kubeadm join command
+      command: kubeadm token create --print-join-command
+      register: join_command_output
+      changed_when: false
+
+    - name: Save join command to shared folder
+      copy:
+        content: "{{ join_command_output.stdout }}"
+        dest: /vagrant/kubeconfig/join-command.sh
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Display join command
+      debug:
+        msg: "Join command saved to /vagrant/kubeconfig/join-command.sh"
