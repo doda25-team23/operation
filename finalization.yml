@@ -1,10 +1,304 @@
----
-#Task B
-
 - name: Kubernetes Cluster Finalization
   hosts: ctrl
   become: yes
+
+  vars:
+    kubeconfig_path: /home/vagrant/.kube/config
+    addons_dir: /home/vagrant/k8s-addons
+    local_k8s_files_dir: "{{ playbook_dir }}/ansible/files/k8s"
+    metallb_version: "0.14.9"
+    metallb_manifest_url: "https://raw.githubusercontent.com/metallb/metallb/v{{ metallb_version }}/config/manifests/metallb-native.yaml"
+    metallb_manifest_path: "{{ addons_dir }}/metallb-native.yaml"
+    metallb_pool_file: "{{ addons_dir }}/metallb-ipaddresspool.yaml"
+    metallb_l2adv_file: "{{ addons_dir }}/metallb-l2advertisement.yaml"
+    ingress_values_src: "{{ local_k8s_files_dir }}/ingress-nginx-values.yaml"
+    ingress_values_dest: "{{ addons_dir }}/ingress-nginx-values.yaml"
+    dashboard_admin_src: "{{ local_k8s_files_dir }}/dashboard-admin-user.yaml"
+    dashboard_admin_dest: "{{ addons_dir }}/dashboard-admin-user.yaml"
+    dashboard_ingress_src: "{{ local_k8s_files_dir }}/dashboard-ingress.yaml"
+    dashboard_ingress_dest: "{{ addons_dir }}/dashboard-ingress.yaml"
+    kubernetes_dashboard_release: kubernetes-dashboard
+    ingress_release_name: ingress-nginx
+    dashboard_domain: dashboard.local
+    istio_version: "1.25.2"
+    istio_archive: "istio-{{ istio_version }}-linux-amd64.tar.gz"
+    istio_download_url: "https://github.com/istio/istio/releases/download/{{ istio_version }}/{{ istio_archive }}"
+    istio_extract_dir: "/opt/istio-{{ istio_version }}"
+    istioctl_binary: /usr/local/bin/istioctl
+    istio_operator_src: "{{ local_k8s_files_dir }}/istio-operator.yaml"
+    istio_operator_dest: "{{ addons_dir }}/istio-operator.yaml"
+
   tasks:
-    - name: Placeholder - Replace with actual implementation
-      ansible.builtin.debug:
-        msg: "Finalization tasks go here"
+    - name: Ensure add-ons staging directory exists
+      file:
+        path: "{{ addons_dir }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: "0755"
+
+    - name: Wait until Kubernetes API is reachable
+      become_user: vagrant
+      command: kubectl version --short
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: kubectl_ping
+      retries: 10
+      delay: 6
+      until: kubectl_ping.rc == 0
+      changed_when: false
+
+    - name: Wait for all nodes to become Ready
+      become_user: vagrant
+      command: kubectl wait --for=condition=Ready node --all --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: wait_nodes
+      changed_when: false
+
+    ##################################################################
+    # MetalLB installation & configuration
+    ##################################################################
+    - name: Download MetalLB native manifest
+      get_url:
+        url: "{{ metallb_manifest_url }}"
+        dest: "{{ metallb_manifest_path }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Apply MetalLB core components
+      become_user: vagrant
+      command: kubectl apply -f "{{ metallb_manifest_path }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: metallb_apply
+      changed_when: >
+        'created' in metallb_apply.stdout or
+        'configured' in metallb_apply.stdout
+
+    - name: Stage MetalLB address pool manifest
+      copy:
+        src: "{{ local_k8s_files_dir }}/metallb-ipaddresspool.yaml"
+        dest: "{{ metallb_pool_file }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Stage MetalLB L2Advertisement manifest
+      copy:
+        src: "{{ local_k8s_files_dir }}/metallb-l2advertisement.yaml"
+        dest: "{{ metallb_l2adv_file }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Apply MetalLB address pool
+      become_user: vagrant
+      command: kubectl apply -f "{{ metallb_pool_file }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: metallb_pool_apply
+      changed_when: >
+        'created' in metallb_pool_apply.stdout or
+        'configured' in metallb_pool_apply.stdout
+
+    - name: Apply MetalLB L2Advertisement
+      become_user: vagrant
+      command: kubectl apply -f "{{ metallb_l2adv_file }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: metallb_l2_apply
+      changed_when: >
+        'created' in metallb_l2_apply.stdout or
+        'configured' in metallb_l2_apply.stdout
+
+    - name: Wait for MetalLB controller to be ready
+      become_user: vagrant
+      command: kubectl wait -n metallb-system -l app=metallb,component=controller --for=condition=Ready pod --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      retries: 5
+      delay: 10
+      register: metallb_wait
+      changed_when: false
+      until: metallb_wait.rc == 0
+
+    ##################################################################
+    # Helm repositories
+    ##################################################################
+    - name: Add/refresh ingress-nginx Helm repository
+      become_user: vagrant
+      command: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx --force-update
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Add/refresh Kubernetes dashboard Helm repository
+      become_user: vagrant
+      command: helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ --force-update
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Update Helm repositories
+      become_user: vagrant
+      command: helm repo update
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    ##################################################################
+    # Ingress-nginx controller
+    ##################################################################
+    - name: Copy ingress-nginx Helm values
+      copy:
+        src: "{{ ingress_values_src }}"
+        dest: "{{ ingress_values_dest }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Deploy ingress-nginx via Helm
+      become_user: vagrant
+      command: >
+        helm upgrade --install {{ ingress_release_name }} ingress-nginx/ingress-nginx
+        --namespace ingress-nginx
+        --create-namespace
+        -f {{ ingress_values_dest }}
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Wait for ingress controller to be ready
+      become_user: vagrant
+      command: kubectl wait -n ingress-nginx -l app.kubernetes.io/component=controller --for=condition=Ready pod --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      retries: 5
+      delay: 10
+      register: ingress_wait
+      changed_when: false
+      until: ingress_wait.rc == 0
+
+    ##################################################################
+    # Kubernetes dashboard
+    ##################################################################
+    - name: Deploy Kubernetes dashboard via Helm
+      become_user: vagrant
+      command: >
+        helm upgrade --install {{ kubernetes_dashboard_release }} kubernetes-dashboard/kubernetes-dashboard
+        --namespace kubernetes-dashboard
+        --create-namespace
+        --set=service.type=ClusterIP
+        --set=metricsScraper.enabled=true
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Wait for dashboard deployment to be ready
+      become_user: vagrant
+      command: kubectl rollout status deploy/kubernetes-dashboard -n kubernetes-dashboard --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Copy dashboard admin manifest
+      copy:
+        src: "{{ dashboard_admin_src }}"
+        dest: "{{ dashboard_admin_dest }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Apply dashboard admin user
+      become_user: vagrant
+      command: kubectl apply -f "{{ dashboard_admin_dest }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: dashboard_admin_apply
+      changed_when: >
+        'created' in dashboard_admin_apply.stdout or
+        'configured' in dashboard_admin_apply.stdout
+
+    - name: Copy dashboard ingress manifest
+      copy:
+        src: "{{ dashboard_ingress_src }}"
+        dest: "{{ dashboard_ingress_dest }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Apply dashboard ingress
+      become_user: vagrant
+      command: kubectl apply -f "{{ dashboard_ingress_dest }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: dashboard_ingress_apply
+      changed_when: >
+        'created' in dashboard_ingress_apply.stdout or
+        'configured' in dashboard_ingress_apply.stdout
+
+    ##################################################################
+    # Istio installation
+    ##################################################################
+    - name: Check if Istio distribution already exists
+      stat:
+        path: "{{ istio_extract_dir }}"
+      register: istio_dir
+
+    - name: Download Istio distribution
+      get_url:
+        url: "{{ istio_download_url }}"
+        dest: "/tmp/{{ istio_archive }}"
+        mode: "0644"
+      when: not istio_dir.stat.exists
+
+    - name: Unpack Istio distribution
+      unarchive:
+        src: "/tmp/{{ istio_archive }}"
+        dest: /opt
+        remote_src: yes
+        creates: "{{ istio_extract_dir }}"
+      when: not istio_dir.stat.exists
+
+    - name: Ensure istioctl is available on PATH
+      file:
+        src: "{{ istio_extract_dir }}/bin/istioctl"
+        dest: "{{ istioctl_binary }}"
+        state: link
+        force: yes
+        mode: "0755"
+
+    - name: Copy Istio operator manifest
+      copy:
+        src: "{{ istio_operator_src }}"
+        dest: "{{ istio_operator_dest }}"
+        owner: vagrant
+        group: vagrant
+        mode: "0644"
+
+    - name: Install / update Istio control plane
+      become_user: vagrant
+      command: >
+        {{ istioctl_binary }} install -y -f {{ istio_operator_dest }}
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Wait for istiod to become Ready
+      become_user: vagrant
+      command: kubectl wait -n istio-system -l app=istiod --for=condition=Ready pod --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      retries: 5
+      delay: 10
+      register: istiod_wait
+      changed_when: false
+      until: istiod_wait.rc == 0
+
+    - name: Wait for Istio ingress gateway to be Ready
+      become_user: vagrant
+      command: kubectl wait -n istio-system -l app=istio-ingressgateway --for=condition=Ready pod --timeout=300s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      retries: 5
+      delay: 10
+      register: istio_ingress_wait
+      changed_when: false
+      until: istio_ingress_wait.rc == 0

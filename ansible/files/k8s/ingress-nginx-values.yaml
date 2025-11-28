@@ -1,0 +1,13 @@
+controller:
+  ingressClass: nginx
+  ingressClassResource:
+    default: true
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Cluster
+    loadBalancerIP: 192.168.56.90
+    annotations:
+      metallb.universe.tf/address-pool: primary-pool
+  config:
+    use-forwarded-headers: "true"
+

@@ -16,6 +16,7 @@ The SMS Spam Detection System is a microservices application that classifies SMS
 - **System**: 4GB RAM minimum, 5GB disk space
 
 Verify installation:
+
 ```bash
 docker --version
 docker-compose --version
@@ -39,6 +40,7 @@ docker-compose up -d --build
 ```
 
 This will:
+
 - Build Docker images for both services (or pull from registry if available)
 - Download the SMS dataset
 - Train the ML model
@@ -47,10 +49,12 @@ This will:
 **Note**: Local builds take 5-10 minutes for model training.
 
 ### 3. Access the application
+
 - **Web UI**: http://localhost:8080/sms
 - **API Documentation**: http://localhost:8081/apidocs
 
 ### 4. Stop the application
+
 ```bash
 docker-compose down
 ```
@@ -59,23 +63,24 @@ docker-compose down
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable     | Default                     | Description     |
+| ------------ | --------------------------- | --------------- |
 | `MODEL_HOST` | `http://model-service:8081` | Backend API URL |
 
 ### Port Configuration
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Frontend | 8080 | Web UI |
-| Model Service | 8081 | ML API |
+| Service       | Port | Description |
+| ------------- | ---- | ----------- |
+| Frontend      | 8080 | Web UI      |
+| Model Service | 8081 | ML API      |
 
 To change ports, edit `docker-compose.yml`:
+
 ```yaml
 services:
   frontend:
     ports:
-      - "9090:8080"  # External:Internal
+      - "9090:8080" # External:Internal
 ```
 
 ## Project Structure
@@ -109,21 +114,25 @@ operation/
 ## Key Repositories for Understanding the Codebase
 
 ### Frontend Service
+
 - **Repository**: https://github.com/doda25-team23/app
 - **Technology**: Java 25, Spring Boot 3.5.7
 - **Key components**: Controllers, Thymeleaf templates, REST client
 
 ### Backend Service
+
 - **Repository**: https://github.com/doda25-team23/model-service
 - **Technology**: Python 3.12, Flask, scikit-learn
 - **Key components**: ML pipeline, preprocessing, model training, API server
 
 ### Version Library
+
 - **Repository**: https://github.com/doda25-team23/lib-version
 - **Technology**: Java, Maven
 - **Purpose**: Version awareness utility for applications
 
 ### Operations
+
 - **Repository**: https://github.com/doda25-team23/operation
 - **Purpose**: Docker Compose, deployment configurations, and operational scripts
 
@@ -142,6 +151,7 @@ Published container images are available on GitHub Container Registry:
 ### Triggering Releases
 
 **Frontend (app)**:
+
 ```bash
 cd app
 git add .
@@ -151,6 +161,7 @@ git push origin master
 ```
 
 **Backend (model-service)**:
+
 ```bash
 cd model-service
 git tag v1.0.0
@@ -158,9 +169,14 @@ git push origin v1.0.0
 # Workflow automatically triggers and builds image with tag version
 ```
 
+## Kubernetes Lab Environment (Assignment A2)
+
+Follow `K8S_SETUP.md` for the complete workflow (prerequisites, `vagrant up`, Person D’s `finalization.yml`, kubeconfig export, troubleshooting, etc.). Keeping the detailed runbook in that single document avoids duplicate instructions here.
+
 ## Future Additions
 
 This repository will contain:
+
 - Vagrant provisioning scripts
 - Ansible playbooks
 - Kubernetes manifests
