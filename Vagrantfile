@@ -25,8 +25,8 @@ Vagrant.configure("2") do |config|
       vb.memory = CTRL_MEMORY
     end
 
-    # Provision controller with Ansible
-    ctrl.vm.provision "ansible" do |ansible|
+    # Provision controller with Ansible (runs inside VM)
+    ctrl.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "general.yaml"
       ansible.groups = {
         "ctrl" => ["ctrl"],
@@ -34,13 +34,16 @@ Vagrant.configure("2") do |config|
           "num_workers" => NUM_WORKERS
         }
       }
+      ansible.install_mode = "default"
+      ansible.provisioning_path = "/vagrant"
     end
 
-    ctrl.vm.provision "ansible" do |ansible|
+    ctrl.vm.provision "ansible_local" do |ansible|
       ansible.playbook = "ctrl.yaml"
       ansible.groups = {
         "ctrl" => ["ctrl"]
       }
+      ansible.provisioning_path = "/vagrant"
     end
   end
 
@@ -56,8 +59,8 @@ Vagrant.configure("2") do |config|
         vb.memory = WORKER_MEMORY
       end
 
-      # Provision worker nodes with Ansible
-      node.vm.provision "ansible" do |ansible|
+      # Provision worker nodes with Ansible (runs inside VM)
+      node.vm.provision "ansible_local" do |ansible|
         ansible.playbook = "general.yaml"
         ansible.groups = {
           "nodes" => ["node-[1:#{NUM_WORKERS}]"],
@@ -65,13 +68,16 @@ Vagrant.configure("2") do |config|
             "num_workers" => NUM_WORKERS
           }
         }
+        ansible.install_mode = "default"
+        ansible.provisioning_path = "/vagrant"
       end
 
-      node.vm.provision "ansible" do |ansible|
+      node.vm.provision "ansible_local" do |ansible|
         ansible.playbook = "node.yaml"
         ansible.groups = {
           "nodes" => ["node-[1:#{NUM_WORKERS}]"]
         }
+        ansible.provisioning_path = "/vagrant"
       end
     end
   end
