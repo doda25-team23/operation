@@ -16,6 +16,16 @@ Links: https://github.com/doda25-team23/model-service/pull/1, https://github.com
 F7 & F8:
 Created Docker compose setup in operation repository. The .yml file orchestrates the frontend (9090) and model-service (8081) microservices, pulling from GH container registry. README.m provides a guide for starting including links to all repos. GH actions workflow is implemented for automated releases, App workflow triggers automatically on pushes to main and extracts versions from pom.xml metadata. The modelservice workflow triggers on Git tags. Both publish versioned and :latest images to GH container registry.
 
+--Made the mistake to work directly on main, the commits:
+Operations:
+7a8a6bccb1a542fb1949921de8db633e852b3712, 3dfcf23bda2237a3ae9e35dacf3fa2b85a075608
+App:
+878e39172c555919bc2941d71915620aa7420a39
+cfa73a015e397bec9a3b031944601849e95d06e0
+Model-service:
+484051246dc9e7cb103f8835c8628609df74da10
+35a0fe5b8024c74333ac3a547ba96519b31fb81f
+
 ### Cristian
 
 F3–F6 & small F10 adjustments:
@@ -36,7 +46,13 @@ Implemented the general.yaml playbook to prepare all cluster nodes with the requ
 
 ### Ocean
 
-VM insfrastructure setup, Vagrantfile that provisions 1 control node and 2 worker nodes running Ubuntu 24.04. Setup includes NAT and host-only networking, has local ansible provisioners for cross-platform, a shared folder for kubeconfig export, and placeholder Ansible playbooks for Radu to work in. Added my SSH key to folder. .
+VM insfrastructure setup, Vagrantfile that provisions 1 control node and 2 worker nodes running Ubuntu 24.04. Setup includes NAT and host-only networking, has local ansible provisioners for cross-platform, a shared folder for kubeconfig export, and placeholder Ansible playbooks for Radu to work in. Added my SSH key to folder.
+
+--Made the mistake to work directly on main, the commits:
+802a102c62a07a8be3d3859ccb6abe34670a4e5b
+88eb0033b642c3bd320f3b9bb2b04b5ad23dffd4
+3abc237a82f0ed1364b80e528f26a1eceae032c3
+
 
 ### Cristian
 
