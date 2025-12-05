@@ -79,3 +79,10 @@ Implemented Kubernetes migration from Docker Compose and Grafana monitoring dash
 
 Operation commits: e3e215b
 PR: https://github.com/doda25-team23/operation/pull/4
+
+### Ocean
+
+Helm Chart part.
+
+PR:
+https://github.com/doda25-team23/operation/pull/6
