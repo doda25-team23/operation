@@ -32,6 +32,10 @@ F3–F6 & small F10 adjustments:
 
 Implemented full containerization and release engineering for both the app and model-service microservices. Added a multi-stage Dockerfile for the app and a flexible, volume-based Dockerfile for the model-service, supporting dynamic ports and external model loading. Set up GitHub Actions workflows in both repositories to automatically build and publish multi-architecture images (amd64/arm64) to the GitHub Container Registry, using tag-based version extraction for model-service and metadata-based versioning for the app. Made both services expose configurable ports and read required configuration through environment variables, making them fully composable and production-ready.
 
+App commits: 6f35491, a12f979, 1294c61
+Model-service commits: 2f712b8
+Operation commits: 355f920
+
 ### Brewen
 
 Delivered F1–F2 by creating the reusable `lib-version` Maven module with a `VersionUtil` class that reads packaged meta-data, exposing the version to the `app` service and wiring in a GitHub Actions workflow that builds/tests the library, tags releases, and publishes to GitHub Packages. Also owned F10–F11: updated `model-service` to fetch its model at startup via a mounted volume instead of bundling it, and extended the release automation so stable releases bump from the current `*-SNAPSHOT` while every branch build produces a timestamped pre-release artifact.
@@ -59,6 +63,19 @@ VM insfrastructure setup, Vagrantfile that provisions 1 control node and 2 worke
 
 Implemented the Kubernetes cluster setup playbooks (ctrl.yaml and node.yaml) to turn provisioned VMs into a fully functional cluster. ctrl.yaml initializes the control plane with kubeadm, exports to both the vagrant user and shared folder for host access, installs Flannel CNI with --iface=eth1 configuration, installs Helm, and generates the join command for worker nodes. The node.yaml handles worker node joining by reading the join command from the shared folder and executing it. Both playbooks include idempotency checks to prevent re-initialization on subsequent runs. Also fixed the /etc/hosts file to match the NUM_WORKERS=2 configuration.
 
+Operation commits: 47c7047, 88ff629, 53aa373
+
 ### Brewen
 
 Owned the Person D scope: authored `finalization.yml` plus the manifests under `ansible/files/k8s/*` to install and configure MetalLB (pool 192.168.56.90–99), deploy the Nginx ingress controller with a fixed LoadBalancer IP, install the Kubernetes Dashboard with admin RBAC + HTTPS ingress, and provision Istio 1.25.2 with a pinned gateway address. Added readiness waits, local staging of all YAML assets, and host instructions in `K8S_SETUP.md`/`README.md` so running `ansible-playbook finalization.yml` from the host consistently finishes the cluster with ingress, dashboard, and mesh support.
+
+---
+
+## Week 4 A3
+
+### Cristian
+
+Implemented Kubernetes migration from Docker Compose and Grafana monitoring dashboards. Created Kubernetes manifests with Deployments, Services, Ingress, ConfigMaps, and Secrets. Added shared VirtualBox folder support via hostPath volumes mounted at /mnt/shared for model persistence. Created two comprehensive Grafana dashboards: application metrics dashboard with Gauge, Counter, and Histogram visualizations using rate and histogram_quantile functions, and A/B testing decision support dashboard with version comparisons, template variables, and deployment annotations. Implemented ConfigMap for automatic dashboard import into Grafana.
+
+Operation commits: e3e215b
+PR: https://github.com/doda25-team23/operation/pull/4

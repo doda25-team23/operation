@@ -182,3 +182,59 @@ This repository will contain:
 - Kubernetes manifests
 - Monitoring configurations
 - CI/CD pipelines
+
+## Kubernetes Deployment (Assignment A3)
+
+### Deploy Application to Kubernetes
+
+```bash
+kubectl apply -f kubernetes/base/
+```
+
+This will create:
+- Namespace: sms-app
+- ConfigMap for application configuration
+- Secret for sensitive data (SMTP credentials - update before production)
+- Deployments for frontend and model-service with health checks
+- Services (ClusterIP) for internal communication
+- Ingress for external access at app.sms-detector.local
+
+### Shared Storage
+
+The model-service deployment uses a hostPath volume mounted at `/mnt/shared` for shared storage across all VMs. Ensure this path exists on all cluster nodes.
+
+### Grafana Dashboards
+
+Two dashboards are provided in `grafana-dashboards/`:
+
+1. **application-metrics.json** - Main application monitoring
+   - Active Users (Gauge)
+   - Request Rate (Counter with rate function)
+   - Response Time Histogram (p50, p90, p99)
+   - Spam vs Ham pie chart
+   - Average response time and error rate stats
+
+2. **ab-testing.json** - A/B testing decision support
+   - Version comparison graphs
+   - Response time comparison (p95)
+   - Error rate comparison
+   - Traffic split visualization
+   - Model accuracy tracking
+   - Template variable for version selection
+   - Deployment annotations
+
+#### Auto-import Dashboards
+
+Apply the ConfigMap to automatically import dashboards into Grafana:
+
+```bash
+kubectl apply -f kubernetes/grafana-dashboard-configmap.yaml
+```
+
+Ensure Grafana is configured to watch for ConfigMaps with label `grafana_dashboard: "1"`.
+
+#### Manual Import
+
+1. Access Grafana UI
+2. Go to Dashboards → Import
+3. Upload JSON files from `grafana-dashboards/` directory
