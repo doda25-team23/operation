@@ -29,11 +29,24 @@
       command: "{{ join_command_content.content | b64decode | trim }}"
       when: not kubelet_conf_check.stat.exists
       register: join_output
+      async: 600
+      poll: 10
+      ignore_errors: yes
 
     - name: Display join output
       debug:
-        var: join_output.stdout_lines
-      when: join_output is defined and join_output.changed
+        var: join_output
+      when: join_output is defined
+
+    - name: Check if join failed
+      debug:
+        msg: "Join command failed. Check the output above for errors."
+      when: join_output is defined and join_output.rc != 0
+
+    - name: Fail if join was unsuccessful
+      fail:
+        msg: "kubeadm join failed. Return code: {{ join_output.rc }}. Output: {{ join_output.stdout }}. Error: {{ join_output.stderr }}"
+      when: join_output is defined and join_output.rc != 0
 
     # Verify join
     - name: Verify kubelet.conf was created
