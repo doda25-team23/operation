@@ -43,6 +43,7 @@ Delivered F1–F2 by creating the reusable `lib-version` Maven module with a `Ve
 ### Radu
 
 Implemented the general.yaml playbook to prepare all cluster nodes with the required base configuration (SSH access, swap disable, kernel modules, sysctl settings, Kubernetes packages, and fully configured containerd). The playbook was tested on node-1 and ran successfully end-to-end using ansible_local via Vagrant. This ensures all machines are ready for the controller/worker setup steps.
+Link: https://github.com/doda25-team23/operation/pull/3
 
 ### Ocean
 
