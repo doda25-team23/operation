@@ -1,0 +1,59 @@
+# Global settings for the whole stack
+global:
+  imagePullPolicy: IfNotPresent
+  imageRegistry: ""   # optional; we use full image repo below
+
+frontend:
+  enabled: true
+  image:
+    # Built and pushed by the GitHub Actions workflow in the app repo
+    repository: ghcr.io/doda25-team23/app
+    tag: "latest"          # can be overridden with --set or -f
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 80               # cluster port; forwards to containerPort below
+  containerPort: 8080      # APP_PORT default in Dockerfile
+  metrics:
+    enabled: true
+    port: 8080             # /metrics will live on same port as the app
+    path: /metrics
+
+modelService:
+  enabled: true
+  image:
+    repository: ghcr.io/doda25-team23/model-service
+    tag: "latest"
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8081             # cluster port; forwards to containerPort below
+  containerPort: 8081      # MODEL_PORT default in Dockerfile
+  metrics:
+    enabled: true
+    port: 8081             # /metrics on same port
+    path: /metrics
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: app.team23.doda.local      # TA will override during grading
+      paths:
+        - path: /
+          pathType: Prefix
+
+prometheus:
+  enabled: true
+  # details will be added later (deployment/service/servicemonitor)
+
+grafana:
+  enabled: true
+  # dashboards wired later via ConfigMap
+
+# Common labels used for ServiceMonitor matching
+monitoring:
+  enabled: true
+  scrapeInterval: 15s
+  labels:
+    release: app-stack
