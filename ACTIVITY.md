@@ -86,3 +86,12 @@ Helm Chart part.
 
 PR:
 https://github.com/doda25-team23/operation/pull/6
+
+### Radu
+
+Monitoring part -> For monitoring, we exposed metrics from both the frontend (Spring Boot Actuator) and the model-service (custom /metrics endpoint). We installed the kube-prometheus-stack Helm chart in the monitoring namespace, which deploys Prometheus, Grafana, and the required CRDs. Our application’s Kubernetes Services were annotated so Prometheus automatically discovers and scrapes them. Grafana was accessed through port-forwarding, where we verified that the frontend and model-service metrics were available for dashboard visualisation.
+
+PRs:
+https://github.com/doda25-team23/model-service/pull/4
+https://github.com/doda25-team23/app/pull/1
+https://github.com/doda25-team23/operation/pull/7
