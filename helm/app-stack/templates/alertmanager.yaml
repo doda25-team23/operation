@@ -1,0 +1,33 @@
+{{- if .Values.alerting.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: {{ include "app-stack.fullname" . }}-alertmanager
+  labels:
+    {{- include "app-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  {{- if or .Values.alerting.webhook.enabled .Values.alerting.email.enabled }}
+  alertmanagerConfigSelector:
+    matchLabels:
+      {{- include "app-stack.selectorLabels" . | nindent 6 }}
+  {{- end }}
+  resources: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "app-stack.fullname" . }}-alertmanager
+  labels:
+    {{- include "app-stack.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: web
+      port: 9093
+      targetPort: 9093
+  selector:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/instance: {{ include "app-stack.fullname" . }}-alertmanager
+{{- end }}
+
