@@ -17,7 +17,7 @@ frontend:
   metrics:
     enabled: true
     port: 8080             # /metrics will live on same port as the app
-    path: /metrics
+    path: /actuator/prometheus
 
 modelService:
   enabled: true
