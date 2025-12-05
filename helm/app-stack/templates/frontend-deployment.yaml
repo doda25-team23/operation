@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app-stack.fullname" . }}-frontend
+  labels:
+    app.kubernetes.io/component: frontend
+    {{- include "app-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: frontend
+      {{- include "app-stack.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: frontend
+        {{- include "app-stack.selectorLabels" . | nindent 8 }}
+        {{- with .Values.monitoring.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+          env:
+            - name: APP_PORT
+              value: "{{ .Values.frontend.containerPort }}"
+            - name: MODEL_HOST
+              value: "http://{{ include "app-stack.fullname" . }}-model-service:{{ .Values.modelService.containerPort }}"
