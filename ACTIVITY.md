@@ -97,3 +97,9 @@ PRs:
 https://github.com/doda25-team23/model-service/pull/4
 https://github.com/doda25-team23/app/pull/1
 https://github.com/doda25-team23/operation/pull/7
+
+### Brewen
+
+Alerting implementation: Configured Prometheus AlertManager with webhook and email notification support. Created Helm chart templates for AlertManager CR, AlertManagerConfig (with webhook and SMTP email receivers), PrometheusRule defining HighRequestRate alert (>15 requests/minute for 2 minutes), and Secret management for SMTP credentials. Integrated AlertManager with Prometheus via alerting configuration and rule selectors. Added support for webhooks as development and email as production option. All sensitive credentials stored in Kubernetes Secrets. Documented setup, configuration, and troubleshooting in ALERTING_SETUP.md.
+
+PR: https://github.com/doda25-team23/operation/pull/8
