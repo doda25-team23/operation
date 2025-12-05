@@ -1,0 +1,210 @@
+{
+  "dashboard": {
+    "title": "A/B Testing Decision Support",
+    "uid": "ab-testing-dashboard",
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "version",
+          "type": "custom",
+          "options": [
+            {"text": "Stable", "value": "stable"},
+            {"text": "Canary", "value": "canary"}
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Version Comparison - Request Rate",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(sms_requests_total{version=\"stable\"}[5m])",
+            "refId": "A",
+            "legendFormat": "Stable"
+          },
+          {
+            "expr": "rate(sms_requests_total{version=\"canary\"}[5m])",
+            "refId": "B",
+            "legendFormat": "Canary"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "legend": {
+          "show": true,
+          "alignAsTable": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 2,
+        "title": "Response Time Comparison (p95)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(sms_response_time_seconds_bucket{version=\"stable\"}[5m]))",
+            "refId": "A",
+            "legendFormat": "Stable p95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(sms_response_time_seconds_bucket{version=\"canary\"}[5m]))",
+            "refId": "B",
+            "legendFormat": "Canary p95"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Response Time"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate Comparison",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(http_errors_total{version=\"stable\"}[5m])",
+            "refId": "A",
+            "legendFormat": "Stable"
+          },
+          {
+            "expr": "rate(http_errors_total{version=\"canary\"}[5m])",
+            "refId": "B",
+            "legendFormat": "Canary"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Errors/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Success Rate",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"2..\",version=\"$version\"}[5m])) / sum(rate(http_requests_total{version=\"$version\"}[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Traffic Split",
+        "type": "piechart",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(sms_requests_total{version=\"stable\"}[5m]))",
+            "refId": "A",
+            "legendFormat": "Stable"
+          },
+          {
+            "expr": "sum(rate(sms_requests_total{version=\"canary\"}[5m]))",
+            "refId": "B",
+            "legendFormat": "Canary"
+          }
+        ],
+        "options": {
+          "pieType": "donut"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Model Accuracy by Version",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(sms_correct_predictions_total{version=\"stable\"}[5m])) / sum(rate(sms_requests_total{version=\"stable\"}[5m])) * 100",
+            "refId": "A",
+            "legendFormat": "Stable"
+          },
+          {
+            "expr": "sum(rate(sms_correct_predictions_total{version=\"canary\"}[5m])) / sum(rate(sms_requests_total{version=\"canary\"}[5m])) * 100",
+            "refId": "B",
+            "legendFormat": "Canary"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "label": "Accuracy", "min": 0, "max": 100},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Decision Metrics Summary",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(sms_requests_total{version=\"stable\"}[5m]))",
+            "refId": "A",
+            "legendFormat": "Stable RPS",
+            "instant": true
+          },
+          {
+            "expr": "sum(rate(sms_requests_total{version=\"canary\"}[5m]))",
+            "refId": "B",
+            "legendFormat": "Canary RPS",
+            "instant": true
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(sms_response_time_seconds_bucket{version=\"stable\"}[5m]))",
+            "refId": "C",
+            "legendFormat": "Stable p95",
+            "instant": true
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(sms_response_time_seconds_bucket{version=\"canary\"}[5m]))",
+            "refId": "D",
+            "legendFormat": "Canary p95",
+            "instant": true
+          }
+        ]
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(sms_requests_total{version=\"canary\"}[1m]) > 0",
+          "iconColor": "blue",
+          "name": "Canary Deployment"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-service
+  namespace: sms-app
+  labels:
+    app: model-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model-service
+  template:
+    metadata:
+      labels:
+        app: model-service
+    spec:
+      containers:
+      - name: model-service
+        image: ghcr.io/doda25-team23/model-service:latest
+        ports:
+        - containerPort: 8081
+          name: http
+        volumeMounts:
+        - name: shared-storage
+          mountPath: /app/shared
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /apidocs
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /apidocs
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: shared-storage
+        hostPath:
+          path: /mnt/shared
+          type: DirectoryOrCreate

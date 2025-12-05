@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  application-metrics.json: |-
+{{ .Files.Get "grafana-dashboards/application-metrics.json" | indent 4 }}
+  ab-testing.json: |-
+{{ .Files.Get "grafana-dashboards/ab-testing.json" | indent 4 }}

@@ -1,0 +1,215 @@
+{
+  "dashboard": {
+    "title": "SMS Application Metrics",
+    "uid": "sms-app-metrics",
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m"]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Users (Gauge)",
+        "type": "gauge",
+        "gridPos": {"x": 0, "y": 0, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "active_users_gauge",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 150
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate (Counter)",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 0, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(sms_requests_total[5m])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Spam vs Ham Distribution",
+        "type": "piechart",
+        "gridPos": {"x": 16, "y": 0, "w": 8, "h": 8},
+        "targets": [
+          {
+            "expr": "sms_requests_total{result=\"spam\"}",
+            "refId": "A",
+            "legendFormat": "Spam"
+          },
+          {
+            "expr": "sms_requests_total{result=\"ham\"}",
+            "refId": "B",
+            "legendFormat": "Ham"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"},
+          "pieType": "pie"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Response Time Histogram",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(sms_response_time_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.90, rate(sms_response_time_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p90"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(sms_response_time_seconds_bucket[5m]))",
+            "refId": "C",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Response Time"},
+          {"format": "short"}
+        ],
+        "legend": {
+          "show": true,
+          "alignAsTable": true,
+          "avg": true,
+          "max": true,
+          "min": true
+        }
+      },
+      {
+        "id": 5,
+        "title": "Request Rate Over Time",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(sms_requests_total[1m])",
+            "refId": "A",
+            "legendFormat": "Total"
+          },
+          {
+            "expr": "rate(sms_requests_total{result=\"spam\"}[1m])",
+            "refId": "B",
+            "legendFormat": "Spam"
+          },
+          {
+            "expr": "rate(sms_requests_total{result=\"ham\"}[1m])",
+            "refId": "C",
+            "legendFormat": "Ham"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "legend": {
+          "show": true,
+          "avg": true
+        }
+      },
+      {
+        "id": 6,
+        "title": "Average Response Time",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 16, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "avg(rate(sms_response_time_seconds_sum[5m]) / rate(sms_response_time_seconds_count[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.5},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Error Rate",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 16, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(http_errors_total[5m])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}
