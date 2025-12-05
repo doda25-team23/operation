@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sms-app.modelService.serviceName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "sms-app.labels" . | nindent 4 }}
+    app: {{ .Values.modelService.service.name }}
+spec:
+  type: {{ .Values.modelService.service.type }}
+  ports:
+  - port: {{ .Values.modelService.service.port }}
+    targetPort: {{ .Values.modelService.service.targetPort }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "sms-app.modelService.selectorLabels" . | nindent 4 }}

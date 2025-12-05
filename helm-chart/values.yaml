@@ -1,0 +1,191 @@
+# Default values for sms-app Helm chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Override the name of the chart
+nameOverride: ""
+# -- Override the full name of the chart
+fullnameOverride: ""
+
+# -- Application namespace
+namespace: sms-app
+
+# Ingress configuration
+ingress:
+  # -- Enable ingress
+  enabled: true
+  # -- Ingress class name (nginx by default)
+  className: nginx
+  # -- Ingress annotations
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  # -- Ingress hostnames
+  hosts:
+    # -- Stable version hostname
+    stable: app.sms-detector.local
+    # -- Canary version hostname (for A4 - traffic management)
+    canary: canary.sms-detector.local
+  # -- TLS configuration (empty by default)
+  tls: []
+  # Example TLS configuration:
+  # tls:
+  #   - secretName: sms-app-tls
+  #     hosts:
+  #       - app.sms-detector.local
+
+# Frontend service configuration
+frontend:
+  # -- Number of frontend replicas
+  replicaCount: 2
+
+  # -- Frontend image configuration
+  image:
+    # -- Frontend image repository
+    repository: ghcr.io/doda25-team23/app
+    # -- Frontend image tag
+    tag: latest
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+
+  # -- Frontend service configuration
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Service name (configurable for service relocation)
+    name: frontend
+    # -- Service port
+    port: 8080
+    # -- Target port (container port)
+    targetPort: 8080
+
+  # -- Frontend resource requests and limits
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # -- Frontend liveness probe configuration
+  livenessProbe:
+    enabled: true
+    path: /
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 30
+
+  # -- Frontend readiness probe configuration
+  readinessProbe:
+    enabled: true
+    path: /
+    port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 10
+
+# Model service configuration
+modelService:
+  # -- Number of model service replicas
+  replicaCount: 2
+
+  # -- Model service image configuration
+  image:
+    # -- Model service image repository
+    repository: ghcr.io/doda25-team23/model-service
+    # -- Model service image tag
+    tag: latest
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+
+  # -- Model service configuration
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Service name (configurable for service relocation)
+    name: model-service
+    # -- Service port (configurable)
+    port: 8081
+    # -- Target port (container port)
+    targetPort: 8081
+
+  # -- Model service resource requests and limits
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  # -- Shared volume configuration (for /mnt/shared across VMs)
+  volume:
+    # -- Enable shared volume
+    enabled: true
+    # -- Host path (shared VirtualBox folder)
+    hostPath: /mnt/shared
+    # -- Mount path inside container
+    mountPath: /app/shared
+
+  # -- Model service liveness probe configuration
+  livenessProbe:
+    enabled: true
+    path: /apidocs
+    port: 8081
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+  # -- Model service readiness probe configuration
+  readinessProbe:
+    enabled: true
+    path: /apidocs
+    port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# ConfigMap data
+config:
+  # -- Log level
+  logLevel: "INFO"
+  # -- Example feature flag
+  featureFlagExample: "true"
+
+# Secret data (IMPORTANT: Override these with --set during installation)
+# These are placeholder values and should NEVER contain real credentials
+secrets:
+  smtp:
+    # -- SMTP username (placeholder - override during install)
+    username: "placeholder-user"
+    # -- SMTP password (placeholder - override during install)
+    password: "placeholder-pass"
+
+# =============================================================================
+# Placeholder sections for teammates to add their components
+# These will be populated by teammates working on monitoring/alerting tasks
+# =============================================================================
+
+# Prometheus configuration (to be added by teammate)
+# prometheus:
+#   enabled: false
+#   replicaCount: 1
+#   image:
+#     repository: prom/prometheus
+#     tag: v2.47.0
+#   # ... additional configuration
+
+# Grafana configuration (to be added by teammate)
+# grafana:
+#   enabled: false
+#   replicaCount: 1
+#   image:
+#     repository: grafana/grafana
+#     tag: 10.2.0
+#   # ... additional configuration
+
+# AlertManager configuration (to be added by teammate)
+# alertmanager:
+#   enabled: false
+#   replicaCount: 1
+#   image:
+#     repository: prom/alertmanager
+#     tag: v0.26.0
+#   # ... additional configuration

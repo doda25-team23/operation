@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sms-app.fullname" . }}-model-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "sms-app.labels" . | nindent 4 }}
+    app: {{ .Values.modelService.service.name }}
+spec:
+  replicas: {{ .Values.modelService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sms-app.modelService.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sms-app.modelService.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: model-service
+        image: "{{ .Values.modelService.image.repository }}:{{ .Values.modelService.image.tag }}"
+        imagePullPolicy: {{ .Values.modelService.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.modelService.service.targetPort }}
+          name: http
+          protocol: TCP
+        {{- if .Values.modelService.volume.enabled }}
+        volumeMounts:
+        - name: shared-storage
+          mountPath: {{ .Values.modelService.volume.mountPath }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.modelService.resources | nindent 10 }}
+        {{- if .Values.modelService.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.modelService.livenessProbe.path }}
+            port: {{ .Values.modelService.livenessProbe.port }}
+          initialDelaySeconds: {{ .Values.modelService.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.modelService.livenessProbe.periodSeconds }}
+        {{- end }}
+        {{- if .Values.modelService.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.modelService.readinessProbe.path }}
+            port: {{ .Values.modelService.readinessProbe.port }}
+          initialDelaySeconds: {{ .Values.modelService.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.modelService.readinessProbe.periodSeconds }}
+        {{- end }}
+      {{- if .Values.modelService.volume.enabled }}
+      volumes:
+      - name: shared-storage
+        hostPath:
+          path: {{ .Values.modelService.volume.hostPath }}
+          type: DirectoryOrCreate
+      {{- end }}
