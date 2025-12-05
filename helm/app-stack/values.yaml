@@ -57,3 +57,27 @@ monitoring:
   scrapeInterval: 15s
   labels:
     release: app-stack
+
+# Alerting configuration
+alerting:
+  enabled: true
+  # Webhook receiver (easiest to test - no SMTP needed!)
+  webhook:
+    enabled: true
+    # Use a webhook testing service like https://webhook.site or your own endpoint
+    url: "https://webhook.site/your-unique-id"  # UPDATE THIS - get a unique URL from webhook.site
+    # Or use a simple HTTP endpoint that logs alerts
+    # url: "http://your-logging-service:8080/alerts"
+  
+  # Email receiver (optional - requires SMTP setup)
+  email:
+    enabled: false  # Set to true if you want email alerts
+    # Email recipient for alerts
+    to: "dev-team@example.com"  # UPDATE THIS with your email
+    # SMTP configuration - these values should be provided via --set or from a Secret
+    # DO NOT commit real credentials to git!
+    smtpFrom: "alerts@example.com"  # UPDATE THIS
+    smtpHost: "smtp.example.com"  # UPDATE THIS (e.g., smtp.gmail.com)
+    smtpPort: "587"  # UPDATE THIS (587 for TLS, 465 for SSL)
+    smtpAuthUsername: "your-email@example.com"  # UPDATE THIS
+    smtpAuthPassword: "your-password"  # UPDATE THIS - use --set or Secret in production!

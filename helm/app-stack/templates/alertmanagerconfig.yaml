@@ -1,0 +1,64 @@
+{{- if .Values.alerting.enabled }}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: {{ include "app-stack.fullname" . }}-config
+  labels:
+    {{- include "app-stack.labels" . | nindent 4 }}
+spec:
+  route:
+    {{- if .Values.alerting.webhook.enabled }}
+    receiver: 'webhook-notifications'
+    {{- else if .Values.alerting.email.enabled }}
+    receiver: 'email-notifications'
+    {{- end }}
+    groupBy: ['alertname']
+    groupWait: 10s
+    groupInterval: 10s
+    repeatInterval: 12h
+  receivers:
+  {{- if .Values.alerting.webhook.enabled }}
+  - name: 'webhook-notifications'
+    webhookConfigs:
+    - url: {{ .Values.alerting.webhook.url | quote }}
+      sendResolved: true
+  {{- end }}
+  {{- if .Values.alerting.email.enabled }}
+  - name: 'email-notifications'
+    emailConfigs:
+    - to: {{ .Values.alerting.email.to | quote }}
+      from: {{ .Values.alerting.email.smtpFrom | quote }}
+      smarthost: {{ printf "%s:%s" .Values.alerting.email.smtpHost .Values.alerting.email.smtpPort | quote }}
+      authUsername: {{ .Values.alerting.email.smtpAuthUsername | quote }}
+      authPassword:
+        name: {{ include "app-stack.fullname" . }}-alertmanager-email
+        key: smtp-auth-password
+      requireTLS: false
+      tlsConfig:
+        insecureSkipVerify: false
+      headers:
+        Subject: "{{`{{ .GroupLabels.alertname }}`}} - Alert Firing"
+        From: {{ .Values.alerting.email.smtpFrom | quote }}
+      html: |
+        <h2>Alert: {{`{{ .GroupLabels.alertname }}`}}</h2>
+        <p><strong>Status:</strong> {{`{{ .Status }}`}}</p>
+        <p><strong>Summary:</strong> {{`{{ .CommonAnnotations.summary }}`}}</p>
+        <p><strong>Description:</strong> {{`{{ .CommonAnnotations.description }}`}}</p>
+        <h3>Labels:</h3>
+        <ul>
+        {{`{{ range .CommonLabels }}`}}
+        <li><strong>{{`{{ .Name }}`}}:</strong> {{`{{ .Value }}`}}</li>
+        {{`{{ end }}`}}
+        </ul>
+        <h3>Firing Alerts:</h3>
+        <ul>
+        {{`{{ range .Alerts }}`}}
+        <li>
+          <strong>{{`{{ .Labels.alertname }}`}}</strong><br/>
+          {{`{{ .Annotations.description }}`}}
+        </li>
+        {{`{{ end }}`}}
+        </ul>
+  {{- end }}
+{{- end }}
+
