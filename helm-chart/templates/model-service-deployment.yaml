@@ -16,6 +16,10 @@ spec:
       labels:
         {{- include "sms-app.modelService.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
       containers:
       - name: model-service
         image: "{{ .Values.modelService.image.repository }}:{{ .Values.modelService.image.tag }}"
@@ -24,6 +28,17 @@ spec:
         - containerPort: {{ .Values.modelService.service.targetPort }}
           name: http
           protocol: TCP
+        env:
+        {{- if .Values.modelService.model.version }}
+        - name: MODEL_VERSION
+          value: {{ .Values.modelService.model.version | quote }}
+        {{- end }}
+        {{- if .Values.modelService.model.baseUrl }}
+        - name: MODEL_BASE_URL
+          value: {{ .Values.modelService.model.baseUrl | quote }}
+        {{- end }}
+        - name: MODEL_DIR
+          value: {{ .Values.modelService.model.dir | default "/app/model" | quote }}
         {{- if .Values.modelService.volume.enabled }}
         volumeMounts:
         - name: shared-storage

@@ -4,3 +4,4 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "sms-app.labels" . | nindent 4 }}
+    istio-injection: enabled
