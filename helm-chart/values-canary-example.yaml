@@ -1,0 +1,84 @@
+# Example values for canary deployment with Istio
+# This file demonstrates how to configure a 90/10 canary release
+
+# Frontend configuration
+frontend:
+  replicaCount: 3  # Increase for better traffic distribution
+  version: v1      # Change to v2 for canary version
+  image:
+    repository: ghcr.io/doda25-team23/app
+    tag: latest    # Use specific version tags for production (e.g., 2.0.0)
+    pullPolicy: IfNotPresent
+
+# Model service configuration
+modelService:
+  replicaCount: 3
+  version: v1      # Change to v2 for canary version
+  image:
+    repository: ghcr.io/doda25-team23/model-service
+    tag: latest    # Use specific version tags for production
+    pullPolicy: IfNotPresent
+
+# Istio traffic management
+istio:
+  enabled: true
+  
+  # IngressGateway selector
+  ingressGateway:
+    name: ingressgateway  # Adjust based on your Istio installation
+  
+  # Gateway hosts
+  hosts:
+    stable: app.sms-detector.local
+    canary: canary.sms-detector.local
+  
+  # Traffic split (must sum to 100)
+  trafficSplit:
+    stable: 90  # 90% to v1 (stable)
+    canary: 10  # 10% to v2 (canary)
+  
+  # Sticky sessions for version consistency
+  stickySession:
+    useCookie: true              # true for cookie-based, false for header-based
+    cookieName: sms-app-version  # Cookie name for sticky sessions
+    cookieTTL: 3600s             # Cookie TTL (1 hour)
+    headerName: x-user-id        # Used when useCookie=false
+
+# Rate limiting
+rateLimit:
+  enabled: true
+  maxTokens: 10
+  tokensPerFill: 10
+  fillInterval: "60s"
+
+# Example deployment scenarios:
+
+# Scenario 1: Initial stable deployment (100% v1)
+# Use default values above
+
+# Scenario 2: Start canary (90/10 split)
+# helm upgrade sms-app ./helm-chart -n sms-app \
+#   --set frontend.version=v2 \
+#   --set frontend.image.tag=2.0.0 \
+#   --set modelService.version=v2 \
+#   --set modelService.image.tag=2.0.0 \
+#   --set istio.trafficSplit.stable=90 \
+#   --set istio.trafficSplit.canary=10
+
+# Scenario 3: Increase canary traffic (50/50)
+# helm upgrade sms-app ./helm-chart -n sms-app \
+#   --set istio.trafficSplit.stable=50 \
+#   --set istio.trafficSplit.canary=50 \
+#   --reuse-values
+
+# Scenario 4: Full promotion (100% v2)
+# helm upgrade sms-app ./helm-chart -n sms-app \
+#   --set istio.trafficSplit.stable=0 \
+#   --set istio.trafficSplit.canary=100 \
+#   --reuse-values
+
+# Scenario 5: Rollback to stable
+# helm upgrade sms-app ./helm-chart -n sms-app \
+#   --set istio.trafficSplit.stable=100 \
+#   --set istio.trafficSplit.canary=0 \
+#   --reuse-values
