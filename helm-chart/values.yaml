@@ -10,6 +10,16 @@ fullnameOverride: ""
 # -- Application namespace
 namespace: sms-app
 
+# -- Image pull secrets for private container registries
+# To use, create a secret first:
+#   kubectl create secret docker-registry ghcr-secret \
+#     --docker-server=ghcr.io \
+#     --docker-username=YOUR_USERNAME \
+#     --docker-password=YOUR_PAT \
+#     -n sms-app
+imagePullSecrets:
+  - name: ghcr-secret
+
 # Ingress configuration
 ingress:
   # -- Enable ingress
@@ -97,6 +107,16 @@ modelService:
     # -- Image pull policy
     pullPolicy: IfNotPresent
 
+  # -- ML Model configuration (F10 - external model location)
+  model:
+    # -- Model version to download (leave empty to skip download)
+    version: ""
+    # -- Base URL for model artifacts (GitHub releases)
+    # Example: "https://github.com/doda25-team23/model-service/releases/download"
+    baseUrl: ""
+    # -- Directory where model will be stored/loaded
+    dir: "/app/model"
+
   # -- Model service configuration
   service:
     # -- Service type
@@ -149,13 +169,25 @@ config:
   # -- Example feature flag
   featureFlagExample: "true"
 
-# Secret data (IMPORTANT: Override these with --set during installation)
-# These are placeholder values and should NEVER contain real credentials
+# Rate limiting configuration (A4)
+rateLimit:
+  # -- Enable rate limiting
+  enabled: true
+  # -- Maximum tokens in bucket (max burst size)
+  maxTokens: 10
+  # -- Tokens added per fill interval
+  tokensPerFill: 10
+  # -- Fill interval (e.g., "60s" for 1 minute, "1m", "30s")
+  fillInterval: "60s"
+  # This configuration allows 10 requests per minute globally
+
+# Secret data (override these with --set during installation)
+# These are placeholder values,should NEVER contain real credentials
 secrets:
   smtp:
-    # -- SMTP username (placeholder - override during install)
+    # -- SMTP username (override during install)
     username: "placeholder-user"
-    # -- SMTP password (placeholder - override during install)
+    # -- SMTP password (override during install)
     password: "placeholder-pass"
 
 # =============================================================================

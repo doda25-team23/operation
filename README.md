@@ -1,240 +1,276 @@
 # SMS Spam Detection System - Operations
 
-This repository contains all operational configurations for deploying and running the SMS Spam Detection System.
+Operational configurations for deploying the SMS Spam Detection microservices application.
 
 ## Overview
 
-The SMS Spam Detection System is a microservices application that classifies SMS messages as spam or legitimate (ham). It consists of two services:
+The system classifies SMS messages as spam or legitimate (ham) using machine learning.
 
-1. **Frontend Service**: Web UI (Spring Boot/Java) - Port 8080
-2. **Model Service**: ML inference API (Flask/Python) - Port 8081
+**Services:**
+- **Frontend**: Web UI (Spring Boot/Java) - Port 8080
+- **Model Service**: ML inference API (Flask/Python) - Port 8081
 
-## Requirements
+**Repositories:**
+- Frontend: https://github.com/doda25-team23/app
+- Model Service: https://github.com/doda25-team23/model-service
+- Version Library: https://github.com/doda25-team23/lib-version
+- Operations: https://github.com/doda25-team23/operation
 
-- **Docker**: Version 20.10 or higher
-- **Docker Compose**: Version 2.0 or higher
-- **System**: 4GB RAM minimum, 5GB disk space
+## Quick Start
 
-Verify installation:
-
-```bash
-docker --version
-docker-compose --version
-```
-
-## How to Start the Application
-
-### Option 1: Using Pre-built Images (Recommended)
+### Docker Compose (Local Development)
 
 ```bash
 cd operation
-docker-compose pull  # Pull latest images from GitHub Container Registry
 docker-compose up -d
 ```
 
-### Option 2: Building Locally
+Access:
+- Web UI: http://localhost:8080/sms
+- API Docs: http://localhost:8081/apidocs
+
+### Kubernetes with Helm (Production)
+
+**Prerequisites:**
+- Kubernetes cluster with Istio installed
+- Helm 3.x
+- kubectl configured
+
+**Deploy:**
 
 ```bash
+# Create namespace with Istio injection
+kubectl create namespace sms-app
+kubectl label namespace sms-app istio-injection=enabled
+
+# Create image pull secret for GitHub Container Registry
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_GITHUB_USERNAME \
+  --docker-password=YOUR_PERSONAL_ACCESS_TOKEN \
+  --docker-email=your-email@example.com \
+  -n sms-app
+
+# Install with Helm
 cd operation
-docker-compose up -d --build
+helm install sms-app ./helm-chart -n sms-app --create-namespace
+
+# Access application (requires minikube tunnel or ingress controller)
+# URL: http://app.sms-detector.local
 ```
 
-This will:
-
-- Build Docker images for both services (or pull from registry if available)
-- Download the SMS dataset
-- Train the ML model
-- Start both services
-
-**Note**: Local builds take 5-10 minutes for model training.
-
-### 3. Access the application
-
-- **Web UI**: http://localhost:8080/sms
-- **API Documentation**: http://localhost:8081/apidocs
-
-### 4. Stop the application
+**Verify deployment:**
 
 ```bash
-docker-compose down
+kubectl get pods -n sms-app
+kubectl get ingress -n sms-app
 ```
-
-## Configuration
-
-### Environment Variables
-
-| Variable     | Default                     | Description     |
-| ------------ | --------------------------- | --------------- |
-| `MODEL_HOST` | `http://model-service:8081` | Backend API URL |
-
-### Port Configuration
-
-| Service       | Port | Description |
-| ------------- | ---- | ----------- |
-| Frontend      | 8080 | Web UI      |
-| Model Service | 8081 | ML API      |
-
-To change ports, edit `docker-compose.yml`:
-
-```yaml
-services:
-  frontend:
-    ports:
-      - "9090:8080" # External:Internal
-```
-
-## Project Structure
-
-```
-operation/
-├── docker-compose.yml       # Service orchestration
-└── README.md               # This file
-
-../app/                     # Frontend service
-├── src/                    # Java source code
-│   └── main/java/frontend/ctrl/
-│       ├── FrontendController.java
-│       └── HelloWorldController.java
-├── pom.xml                 # Maven configuration
-└── Dockerfile              # Container definition
-
-../model-service/           # Backend ML service
-├── src/                    # Python source code
-│   ├── get_data.py         # Dataset download
-│   ├── text_preprocessing.py
-│   ├── text_classification.py
-│   └── serve_model.py      # API server
-├── requirements.txt        # Dependencies
-└── Dockerfile              # Container definition
-
-../lib-version/             # Version library
-└── src/main/java/doda25/team23/VersionUtil.java
-```
-
-## Key Repositories for Understanding the Codebase
-
-### Frontend Service
-
-- **Repository**: https://github.com/doda25-team23/app
-- **Technology**: Java 25, Spring Boot 3.5.7
-- **Key components**: Controllers, Thymeleaf templates, REST client
-
-### Backend Service
-
-- **Repository**: https://github.com/doda25-team23/model-service
-- **Technology**: Python 3.12, Flask, scikit-learn
-- **Key components**: ML pipeline, preprocessing, model training, API server
-
-### Version Library
-
-- **Repository**: https://github.com/doda25-team23/lib-version
-- **Technology**: Java, Maven
-- **Purpose**: Version awareness utility for applications
-
-### Operations
-
-- **Repository**: https://github.com/doda25-team23/operation
-- **Purpose**: Docker Compose, deployment configurations, and operational scripts
 
 ## Container Images
 
-Published container images are available on GitHub Container Registry:
+Published on GitHub Container Registry:
+- Frontend: `ghcr.io/doda25-team23/app:latest`
+- Model Service: `ghcr.io/doda25-team23/model-service:latest`
 
-- **Frontend**: `ghcr.io/doda25-team23/app:latest`
-- **Backend**: `ghcr.io/doda25-team23/model-service:latest`
+## Features
 
-### Versioning
+### Rate Limiting (Istio)
 
-- **app**: Version automatically extracted from `pom.xml` on every push to main/master
-- **model-service**: Version determined by git tags (format: `v1.0.0`)
+Protects against excessive API usage using Istio EnvoyFilter.
 
-### Triggering Releases
+**Configuration:** 10 requests per minute per pod (global limit)
 
-**Frontend (app)**:
-
-```bash
-cd app
-git add .
-git commit -m "Update application"
-git push origin master
-# Workflow automatically triggers and builds image with version from pom.xml
-```
-
-**Backend (model-service)**:
+**Test rate limiting:**
 
 ```bash
-cd model-service
-git tag v1.0.0
-git push origin v1.0.0
-# Workflow automatically triggers and builds image with tag version
+# Send rapid requests to trigger rate limiting
+for i in {1..20}; do
+  curl -s -o /dev/null -w "Request $i: %{http_code}\n" http://app.sms-detector.local
+done
+
+# Expected: Mix of 200 (success) and 429 (rate limited) responses
 ```
 
-## Kubernetes Lab Environment (Assignment A2)
+**Configure limits** in `helm-chart/values.yaml`:
 
-Follow `K8S_SETUP.md` for the complete workflow (prerequisites, `vagrant up`, Person D’s `finalization.yml`, kubeconfig export, troubleshooting, etc.). Keeping the detailed runbook in that single document avoids duplicate instructions here.
+```yaml
+rateLimit:
+  enabled: true
+  maxTokens: 10          # Max burst size
+  tokensPerFill: 10      # Tokens per interval
+  fillInterval: "60s"    # Time interval (10 req/min)
+```
 
-## Future Additions
+**How it works:**
+- Applied to frontend service via Istio EnvoyFilter
+- Uses token bucket algorithm
+- Returns HTTP 429 when limit exceeded
+- Each pod has independent rate limit bucket
 
-This repository will contain:
+### Monitoring & Alerting
 
-- Vagrant provisioning scripts
-- Ansible playbooks
-- Kubernetes manifests
-- Monitoring configurations
-- CI/CD pipelines
+Grafana dashboards available in `grafana-dashboards/`:
+- **application-metrics.json**: Request rates, response times, error rates
+- **ab-testing.json**: A/B testing comparison and decision support
 
-## Kubernetes Deployment (Assignment A3)
+## Configuration
 
-### Deploy Application to Kubernetes
+### Helm Chart Values
+
+Key configuration options in `helm-chart/values.yaml`:
+
+```yaml
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/doda25-team23/app
+    tag: latest
+
+modelService:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/doda25-team23/model-service
+    tag: latest
+
+ingress:
+  enabled: true
+  hosts:
+    stable: app.sms-detector.local
+
+rateLimit:
+  enabled: true
+  maxTokens: 10
+  fillInterval: "60s"
+```
+
+### Environment Variables
+
+| Variable     | Default                     | Description           |
+| ------------ | --------------------------- | --------------------- |
+| `MODEL_HOST` | `http://model-service:8081` | Backend API URL       |
+| `MODEL_DIR`  | `/app/model`                | ML model directory    |
+| `MODEL_PORT` | `8081`                      | Model service port    |
+
+## Kubernetes Environments
+
+### Assignment A2: Cluster Provisioning
+See [K8S_SETUP.md](K8S_SETUP.md) for Vagrant + Ansible setup.
+
+### Assignment A3: Monitoring & Operations
+- Prometheus metrics collection
+- Grafana dashboards
+- Alertmanager configuration
+- See [ALERTING_SETUP.md](ALERTING_SETUP.md)
+
+### Assignment A4: Istio Service Mesh
+- Rate limiting (EnvoyFilter)
+- Traffic management
+- Canary deployments
+- See [ACTIVITY.md](ACTIVITY.md)
+
+## Troubleshooting
+
+**Pods stuck in ImagePullBackOff:**
+- Verify GitHub Container Registry credentials in `ghcr-secret`
+- Check image names and tags in `values.yaml`
+
+**Rate limiting not working:**
+- Verify Istio sidecars injected: `kubectl get pods -n sms-app` (should show 2/2 Ready)
+- Check EnvoyFilter exists: `kubectl get envoyfilter -n sms-app`
+- Verify namespace has Istio injection: `kubectl get namespace sms-app --show-labels`
+
+**Ingress not accessible:**
+- Ensure ingress controller is running: `kubectl get pods -n ingress-nginx`
+- For minikube: Run `minikube tunnel` in separate terminal
+- Add hostname to `/etc/hosts`: `<MINIKUBE_IP> app.sms-detector.local`
+
+## Cleanup
 
 ```bash
-kubectl apply -f kubernetes/base/
+# Remove Helm release
+helm uninstall sms-app -n sms-app
+
+# Delete namespace
+kubectl delete namespace sms-app
+
+# Stop Docker Compose
+docker-compose down
 ```
 
-This will create:
-- Namespace: sms-app
-- ConfigMap for application configuration
-- Secret for sensitive data (SMTP credentials - update before production)
-- Deployments for frontend and model-service with health checks
-- Services (ClusterIP) for internal communication
-- Ingress for external access at app.sms-detector.local
+## Architecture Diagram
 
-### Shared Storage
+### Rate Limiting with Istio
 
-The model-service deployment uses a hostPath volume mounted at `/mnt/shared` for shared storage across all VMs. Ensure this path exists on all cluster nodes.
-
-### Grafana Dashboards
-
-Two dashboards are provided in `grafana-dashboards/`:
-
-1. **application-metrics.json** - Main application monitoring
-   - Active Users (Gauge)
-   - Request Rate (Counter with rate function)
-   - Response Time Histogram (p50, p90, p99)
-   - Spam vs Ham pie chart
-   - Average response time and error rate stats
-
-2. **ab-testing.json** - A/B testing decision support
-   - Version comparison graphs
-   - Response time comparison (p95)
-   - Error rate comparison
-   - Traffic split visualization
-   - Model accuracy tracking
-   - Template variable for version selection
-   - Deployment annotations
-
-#### Auto-import Dashboards
-
-Apply the ConfigMap to automatically import dashboards into Grafana:
-
-```bash
-kubectl apply -f kubernetes/grafana-dashboard-configmap.yaml
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Kubernetes Cluster                       │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │                    Namespace: sms-app                     │ │
+│  │                (istio-injection: enabled)                 │ │
+│  │                                                           │ │
+│  │   External Request                                        │ │
+│  │         │                                                 │ │
+│  │         ▼                                                 │ │
+│  │   ┌──────────┐                                            │ │
+│  │   │ Ingress  │  (nginx)                                   │ │
+│  │   │ Gateway  │  app.sms-detector.local                    │ │
+│  │   └────┬─────┘                                            │ │
+│  │        │                                                  │ │
+│  │        ▼                                                  │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │   Pod: frontend (2/2 Running)       │                │ │
+│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
+│  │   │  │ istio-proxy  │  │   frontend   │ │                │ │
+│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │ Rate Limit:  │  │  Port 8080   │ │                │ │
+│  │   │  │ 10 req/min   │  │              │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │ ✓ Allow      │  └──────┬───────┘ │                │ │
+│  │   │  │ ✗ HTTP 429   │         │         │                │ │
+│  │   │  └──────┬───────┘         │         │                │ │
+│  │   │         │                 │         │                │ │
+│  │   │         └─────────────────┘         │                │ │
+│  │   │                 │                   │                │ │
+│  │   └─────────────────┼───────────────────┘                │ │
+│  │                     │                                     │ │
+│  │                     ▼                                     │ │
+│  │             ┌───────────────┐                             │ │
+│  │             │   Service:    │                             │ │
+│  │             │ model-service │                             │ │
+│  │             │ ClusterIP     │                             │ │
+│  │             └───────┬───────┘                             │ │
+│  │                     │                                     │ │
+│  │                     ▼                                     │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │   Pod: model-service (2/2 Running)  │                │ │
+│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
+│  │   │  │ istio-proxy  │  │ model-service│ │                │ │
+│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │              │  │  Port 8081   │ │                │ │
+│  │   │  └──────────────┘  └──────────────┘ │                │ │
+│  │   └─────────────────────────────────────┘                │ │
+│  │                                                           │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │        EnvoyFilter Resource         │                │ │
+│  │   │  name: sms-app-rate-limit           │                │ │
+│  │   │  workloadSelector:                  │                │ │
+│  │   │    app: frontend                    │                │ │
+│  │   │  config:                            │                │ │
+│  │   │    maxTokens: 10                    │                │ │
+│  │   │    fillInterval: 60s                │                │ │
+│  │   └─────────────────────────────────────┘                │ │
+│  │                                                           │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 
-Ensure Grafana is configured to watch for ConfigMaps with label `grafana_dashboard: "1"`.
-
-#### Manual Import
-
-1. Access Grafana UI
-2. Go to Dashboards → Import
-3. Upload JSON files from `grafana-dashboards/` directory
+Traffic Flow with Rate Limiting:
+1. Request → Ingress → istio-proxy (sidecar)
+2. istio-proxy checks token bucket (10 tokens available)
+3. If tokens available: Allow → forward to frontend container
+4. If no tokens: Block → return HTTP 429 (rate limited)
+5. Tokens refill at 10 tokens per 60 seconds
+```
