@@ -110,6 +110,34 @@ PR: https://github.com/doda25-team23/operation/pull/
 
 ### Cristian
 
+Implemented Istio traffic management and canary release capabilities with 90/10 traffic split and sticky sessions. Created comprehensive Helm chart templates for Istio Gateway (configurable IngressGateway name), VirtualServices for both frontend and model-service with header-based version override support (x-version header), and DestinationRules defining v1/v2 subsets with consistent hash load balancing. Implemented dual sticky session modes (cookie-based with configurable TTL and header-based) to ensure version consistency (old→old, new→new routing). Added version labels to deployment templates, extended values.yaml with full Istio configuration section (90/10 traffic split, configurable gateway, sticky sessions), and documented complete canary deployment workflow including traffic split adjustment, sticky session testing, and promotion strategies in README.md.
+
+Created 5 Istio templates:
+- gateway.yaml (Istio Gateway with configurable IngressGateway selector)
+- virtualservice-frontend.yaml (external routing rules with 90/10 split)
+- virtualservice-model-service.yaml (internal service routing)
+- destinationrule-frontend.yaml (v1/v2 subsets + sticky sessions)
+- destinationrule-model-service.yaml (v1/v2 subsets + sticky sessions)
+
+Documentation and tools:
+- ISTIO_TESTING.md: Comprehensive 8-test validation guide
+- IMPLEMENTATION_SUMMARY.md: Technical implementation details
+- ISTIO_QUICK_REFERENCE.md: Quick command reference
+- values-canary-example.yaml: Example configurations for 5 deployment scenarios
+- verify-istio-implementation.sh: Automated validation script
+- Updated README.md with 126-line Traffic Management & Canary Release section
+- Updated helm-chart/README.md with complete Istio documentation
+
+Key features:
+- 90/10 canary release with configurable traffic split
+- Cookie-based sticky sessions (sms-app-version cookie, 1h TTL)
+- Header-based sticky sessions (x-user-id for consistent hashing)
+- Header version override (x-version: v1 or v2)
+- Configurable IngressGateway name for different Istio installations
+- Complete canary promotion workflow (10% → 50% → 100%)
+
+Operation commits: 2e71127
+PR: https://github.com/doda25-team23/operation/pull/10
 
 ### Ocean
 Implemented rate limiting using lstio's envoyfilter to provide limit of 10 reqs/min per frontend pod. It includes an envoyfilter resource that applies envoy's local rate limiting with a token bucket algorithm to frontend pods, configurable through Helm chart's values yaml with params for maxtokens, refillrate, and interval. System returns HTTP 429 if limit exceeded. 
