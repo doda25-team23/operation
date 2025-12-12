@@ -222,6 +222,9 @@ PR: https://github.com/doda25-team23/operation/pull/9
 
 ### Radu
 
+Prepared the system for continuous experimentation by enabling parallel deployment of frontend and model-service versions (v1/v2) via Helm. Added version-aware deployment templates, injected APP_VERSION into frontend pods, and configured ServiceMonitors to allow Prometheus to scrape metrics from both services. Infrastructure is now ready for versioned traffic routing and experiment instrumentation.
+
+PR: https://github.com/doda25-team23/operation/pull/11
 
 
 ### Brewen
