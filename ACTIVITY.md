@@ -112,7 +112,85 @@ PR: https://github.com/doda25-team23/operation/pull/
 
 
 ### Ocean
+Implemented rate limiting using lstio's envoyfilter to provide limit of 10 reqs/min per frontend pod. It includes an envoyfilter resource that applies envoy's local rate limiting with a token bucket algorithm to frontend pods, configurable through Helm chart's values yaml with params for maxtokens, refillrate, and interval. System returns HTTP 429 if limit exceeded. 
 
+Added imagePullSecrets to Helm deployments for private GH container registry access
+Added lstio injection label to the namespace template
+
+Rate limiting visualization:
+┌─────────────────────────────────────────────────────────────────┐
+│                        Kubernetes Cluster                       │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │                    Namespace: sms-app                     │ │
+│  │                (istio-injection: enabled)                 │ │
+│  │                                                           │ │
+│  │   External Request                                        │ │
+│  │         │                                                 │ │
+│  │         ▼                                                 │ │
+│  │   ┌──────────┐                                            │ │
+│  │   │ Ingress  │  (nginx)                                   │ │
+│  │   │ Gateway  │  app.sms-detector.local                    │ │
+│  │   └────┬─────┘                                            │ │
+│  │        │                                                  │ │
+│  │        ▼                                                  │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │   Pod: frontend (2/2 Running)       │                │ │
+│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
+│  │   │  │ istio-proxy  │  │   frontend   │ │                │ │
+│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │ Rate Limit:  │  │  Port 8080   │ │                │ │
+│  │   │  │ 10 req/min   │  │              │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │ ✓ Allow      │  └──────┬───────┘ │                │ │
+│  │   │  │ ✗ HTTP 429   │         │         │                │ │
+│  │   │  └──────┬───────┘         │         │                │ │
+│  │   │         │                 │         │                │ │
+│  │   │         └─────────────────┘         │                │ │
+│  │   │                 │                   │                │ │
+│  │   └─────────────────┼───────────────────┘                │ │
+│  │                     │                                    │ │
+│  │                     ▼                                    │ │
+│  │             ┌───────────────┐                            │ │
+│  │             │   Service:    │                            │ │
+│  │             │ model-service │                            │ │
+│  │             │ ClusterIP     │                            │ │
+│  │             └───────┬───────┘                            │ │
+│  │                     │                                    │ │
+│  │                     ▼                                    │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │   Pod: model-service (2/2 Running)  │                │ │
+│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
+│  │   │  │ istio-proxy  │  │ model-service│ │                │ │
+│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
+│  │   │  │              │  │              │ │                │ │
+│  │   │  │              │  │  Port 8081   │ │                │ │
+│  │   │  └──────────────┘  └──────────────┘ │                │ │
+│  │   └─────────────────────────────────────┘                │ │
+│  │                                                          │ │
+│  │   ┌─────────────────────────────────────┐                │ │
+│  │   │        EnvoyFilter Resource         │                │ │
+│  │   │  name: sms-app-rate-limit           │                │ │
+│  │   │  workloadSelector:                  │                │ │
+│  │   │    app: frontend                    │                │ │
+│  │   │  config:                            │                │ │
+│  │   │    maxTokens: 10                    │                │ │
+│  │   │    fillInterval: 60s                │                │ │
+│  │   └─────────────────────────────────────┘                │ │
+│  │                                                           │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+Traffic Flow with Rate Limiting:
+1. request ->ingress-> istio-proxy (sidecar)
+2. istio-proxy checks token bucket (10 tokens available)
+3. If tokens available: allow-> forward to frontend container
+4. If no tokens: block ->return HTTP 429 (rate limited)
+5. Tokens refill at 10 tokens per 60 seconds
+
+PR: https://github.com/doda25-team23/operation/pull/9
 
 ### Radu
 
