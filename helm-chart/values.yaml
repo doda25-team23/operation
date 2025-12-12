@@ -47,6 +47,9 @@ ingress:
 frontend:
   # -- Number of frontend replicas
   replicaCount: 2
+  
+  # -- Frontend version label (for canary deployments)
+  version: v1
 
   # -- Frontend image configuration
   image:
@@ -97,6 +100,9 @@ frontend:
 modelService:
   # -- Number of model service replicas
   replicaCount: 2
+  
+  # -- Model service version label (for canary deployments)
+  version: v1
 
   # -- Model service image configuration
   image:
@@ -180,6 +186,41 @@ rateLimit:
   # -- Fill interval (e.g., "60s" for 1 minute, "1m", "30s")
   fillInterval: "60s"
   # This configuration allows 10 requests per minute globally
+
+# Istio configuration (A4 - Traffic Management & Canary Release)
+istio:
+  # -- Enable Istio Gateway and traffic management
+  enabled: true
+  
+  # -- Istio IngressGateway configuration
+  ingressGateway:
+    # -- IngressGateway name (configurable for different Istio installations)
+    name: ingressgateway
+  
+  # -- Hostnames for Gateway
+  hosts:
+    # -- Stable version hostname
+    stable: app.sms-detector.local
+    # -- Canary version hostname (optional)
+    canary: canary.sms-detector.local
+  
+  # -- Traffic split between stable and canary versions
+  trafficSplit:
+    # -- Percentage of traffic to stable (v1) version
+    stable: 90
+    # -- Percentage of traffic to canary (v2) version
+    canary: 10
+  
+  # -- Sticky session configuration for version consistency
+  stickySession:
+    # -- Use cookie-based sticky sessions (true) or header-based (false)
+    useCookie: true
+    # -- Cookie name for sticky sessions (when useCookie is true)
+    cookieName: sms-app-version
+    # -- Cookie TTL (time to live)
+    cookieTTL: 3600s
+    # -- Header name for sticky sessions (when useCookie is false)
+    headerName: x-user-id
 
 # Secret data (override these with --set during installation)
 # These are placeholder values,should NEVER contain real credentials

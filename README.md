@@ -107,6 +107,132 @@ rateLimit:
 - Returns HTTP 429 when limit exceeded
 - Each pod has independent rate limit bucket
 
+### Traffic Management & Canary Release (Istio)
+
+Enables controlled rollout of new versions with 90/10 traffic split and sticky sessions for version consistency.
+
+**Architecture:**
+
+The system uses Istio's traffic management capabilities to route traffic between stable (v1) and canary (v2) versions:
+
+1. **Istio Gateway**: Entry point for external traffic on port 80
+2. **VirtualServices**: Define routing rules for both frontend and model-service
+3. **DestinationRules**: Define version subsets (v1, v2) with sticky session configuration
+4. **Sticky Sessions**: Ensure users consistently hit the same version (old→old, new→new)
+
+**Traffic Flow:**
+
+```
+External Request
+     ↓
+Istio Gateway (port 80)
+     ↓
+VirtualService (routing rules)
+     ├─ 90% → v1 subset (stable)
+     └─ 10% → v2 subset (canary)
+     ↓
+DestinationRule (load balancing + sticky sessions)
+     ↓
+Service Pods (with version labels)
+```
+
+**Configuration:**
+
+Traffic split is controlled in `helm-chart/values.yaml`:
+
+```yaml
+istio:
+  enabled: true
+  trafficSplit:
+    stable: 90  # 90% to v1
+    canary: 10  # 10% to v2
+  stickySession:
+    useCookie: true
+    cookieName: sms-app-version
+    cookieTTL: 3600s
+```
+
+**Deploy canary version:**
+
+```bash
+# Deploy v2 (canary) version
+helm upgrade sms-app ./helm-chart -n sms-app \
+  --set frontend.version=v2 \
+  --set frontend.image.tag=v2.0.0 \
+  --set modelService.version=v2 \
+  --set modelService.image.tag=v2.0.0 \
+  --reuse-values
+
+# Monitor traffic distribution
+kubectl get virtualservices -n sms-app
+kubectl get destinationrules -n sms-app
+
+# Check pod versions
+kubectl get pods -n sms-app --show-labels
+```
+
+**Sticky Sessions:**
+
+Ensures version consistency - once a user is routed to v1 or v2, they stay on that version:
+
+- **Cookie-based** (default): Uses `sms-app-version` cookie with 1-hour TTL
+- **Header-based**: Uses `x-user-id` header for consistent hashing
+
+**Testing sticky sessions:**
+
+```bash
+# First request - get assigned to a version
+curl -c cookies.txt http://app.sms-detector.local
+
+# Subsequent requests - stay on same version
+curl -b cookies.txt http://app.sms-detector.local
+curl -b cookies.txt http://app.sms-detector.local
+```
+
+**Force specific version (testing):**
+
+```bash
+# Force v1
+curl -H "x-version: v1" http://app.sms-detector.local
+
+# Force v2
+curl -H "x-version: v2" http://app.sms-detector.local
+```
+
+**IngressGateway Configuration:**
+
+The gateway name is configurable to support different Istio installations:
+
+```yaml
+istio:
+  ingressGateway:
+    name: ingressgateway  # Change to match your Istio installation
+```
+
+Common gateway names:
+- `ingressgateway` (default Istio installation)
+- `istio-ingressgateway` (some distributions)
+- Custom names in multi-tenant clusters
+
+**Canary promotion workflow:**
+
+```bash
+# 1. Deploy canary (10% traffic)
+helm upgrade sms-app ./helm-chart --set istio.trafficSplit.canary=10
+
+# 2. Monitor metrics (error rates, latency)
+# Use Grafana dashboards to compare v1 vs v2
+
+# 3. Increase canary traffic gradually
+helm upgrade sms-app ./helm-chart --set istio.trafficSplit.stable=50 --set istio.trafficSplit.canary=50
+
+# 4. Full promotion (100% to v2)
+helm upgrade sms-app ./helm-chart --set istio.trafficSplit.stable=0 --set istio.trafficSplit.canary=100
+
+# 5. Clean up old version
+# Update default version label and remove v1 deployments
+```
+
 ### Monitoring & Alerting
 
 Grafana dashboards available in `grafana-dashboards/`:
@@ -141,6 +267,21 @@ rateLimit:
   enabled: true
   maxTokens: 10
   fillInterval: "60s"
+
+istio:
+  enabled: true
+  ingressGateway:
+    name: ingressgateway
+  hosts:
+    stable: app.sms-detector.local
+    canary: canary.sms-detector.local
+  trafficSplit:
+    stable: 90
+    canary: 10
+  stickySession:
+    useCookie: true
+    cookieName: sms-app-version
+    cookieTTL: 3600s
 ```
 
 ### Environment Variables
@@ -164,9 +305,11 @@ See [K8S_SETUP.md](K8S_SETUP.md) for Vagrant + Ansible setup.
 
 ### Assignment A4: Istio Service Mesh
 - Rate limiting (EnvoyFilter)
-- Traffic management
-- Canary deployments
+- Traffic management (Istio Gateway, VirtualServices, DestinationRules)
+- Canary deployments (90/10 traffic split)
+- Sticky sessions (cookie/header-based for version consistency)
 - See [ACTIVITY.md](ACTIVITY.md)
+- Testing guide: [ISTIO_TESTING.md](ISTIO_TESTING.md)
 
 ## Troubleshooting
 

@@ -1,0 +1,46 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "sms-app.fullname" . }}-model-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "sms-app.labels" . | nindent 4 }}
+spec:
+  hosts:
+  - {{ include "sms-app.modelService.serviceName" . }}
+  http:
+  - match:
+    - headers:
+        x-version:
+          exact: "v2"
+    route:
+    - destination:
+        host: {{ include "sms-app.modelService.serviceName" . }}
+        port:
+          number: {{ .Values.modelService.service.port }}
+        subset: v2
+  - match:
+    - headers:
+        x-version:
+          exact: "v1"
+    route:
+    - destination:
+        host: {{ include "sms-app.modelService.serviceName" . }}
+        port:
+          number: {{ .Values.modelService.service.port }}
+        subset: v1
+  - route:
+    - destination:
+        host: {{ include "sms-app.modelService.serviceName" . }}
+        port:
+          number: {{ .Values.modelService.service.port }}
+        subset: v1
+      weight: {{ .Values.istio.trafficSplit.stable }}
+    - destination:
+        host: {{ include "sms-app.modelService.serviceName" . }}
+        port:
+          number: {{ .Values.modelService.service.port }}
+        subset: v2
+      weight: {{ .Values.istio.trafficSplit.canary }}
+{{- end }}

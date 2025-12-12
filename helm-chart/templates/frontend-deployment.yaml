@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         {{- include "sms-app.frontend.selectorLabels" . | nindent 8 }}
+        version: {{ .Values.frontend.version | default "v1" }}
     spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:

@@ -1,0 +1,22 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "sms-app.fullname" . }}-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "sms-app.labels" . | nindent 4 }}
+spec:
+  selector:
+    istio: {{ .Values.istio.ingressGateway.name }}
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - {{ .Values.istio.hosts.stable | quote }}
+    {{- if .Values.istio.hosts.canary }}
+    - {{ .Values.istio.hosts.canary | quote }}
+    {{- end }}
+{{- end }}
