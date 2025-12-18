@@ -49,41 +49,41 @@ flowchart TB
     direction TB
 
     subgraph istio_ns[Namespace: istio-system]
-      igw[Service: istio-ingressgateway\nLB IP: 192.168.56.91\nPort: 80]
+      igw[Service: istio-ingressgateway<br/>LB IP: 192.168.56.91<br/>Port: 80]
     end
 
     subgraph nginx_ns[Namespace: ingress-nginx]
-      nginx[Service: ingress-nginx-controller\nLB IP: 192.168.56.90\nPort: 80]
+      nginx[Service: ingress-nginx-controller<br/>LB IP: 192.168.56.90<br/>Port: 80]
     end
 
-    subgraph appns[Namespace: sms-app\nlabel: istio-injection=enabled]
-      fe_svc[Service: frontend\nPort 8080]
-      ms_svc[Service: model-service\nPort 8081]
+    subgraph appns[Namespace: sms-app<br/>label: istio-injection=enabled]
+      fe_svc[Service: frontend<br/>Port 8080]
+      ms_svc[Service: model-service<br/>Port 8081]
 
-      fe_v1[Pods: frontend v1\ncontainerPort 8080\n+ istio-proxy]
-      fe_v2[Pods: frontend v2\ncontainerPort 8080\n+ istio-proxy]
+      fe_v1[Pods: frontend v1<br/>containerPort 8080<br/>+ istio-proxy]
+      fe_v2[Pods: frontend v2<br/>containerPort 8080<br/>+ istio-proxy]
 
-      ms_v1[Pods: model-service v1\ncontainerPort 8081\n+ istio-proxy]
-      ms_v2[Pods: model-service v2\ncontainerPort 8081\n+ istio-proxy]
+      ms_v1[Pods: model-service v1<br/>containerPort 8081<br/>+ istio-proxy]
+      ms_v2[Pods: model-service v2<br/>containerPort 8081<br/>+ istio-proxy]
 
       %% Istio traffic management resources
-      gw[Istio Gateway\nport 80\nhosts: app.sms-detector.local, canary.sms-detector.local]
-      vs_fe[VirtualService: frontend\nweighted routing + x-version override]
-      dr_fe[DestinationRule: frontend\nsubsets v1/v2 + sticky sessions]
-      vs_ms[VirtualService: model-service\nweighted routing + x-version override]
-      dr_ms[DestinationRule: model-service\nsubsets v1/v2 + sticky sessions]
+      gw[Istio Gateway<br/>port 80<br/>hosts: app.sms-detector.local, canary.sms-detector.local]
+      vs_fe[VirtualService: frontend<br/>weighted routing + x-version override]
+      dr_fe[DestinationRule: frontend<br/>subsets v1/v2 + sticky sessions]
+      vs_ms[VirtualService: model-service<br/>weighted routing + x-version override]
+      dr_ms[DestinationRule: model-service<br/>subsets v1/v2 + sticky sessions]
 
       %% Rate limit
-      rl[EnvoyFilter: local rate limit\nworkloadSelector app=frontend]
+      rl[EnvoyFilter: local rate limit<br/>workloadSelector app=frontend]
     end
 
     subgraph mon[Monitoring and Alerting - Prometheus Operator]
-      sm[ServiceMonitors\nfrontend and model-service]
-      prom[Prometheus\nService port 9090]
-      rule[PrometheusRule\nHighRequestRate]
-      am[Alertmanager\nService port 9093]
-      amcfg[AlertmanagerConfig\nwebhook or email routing]
-      gfdash[Grafana dashboards ConfigMap\ngrafana_dashboard=1]
+      sm[ServiceMonitors<br/>frontend and model-service]
+      prom[Prometheus<br/>Service port 9090]
+      rule[PrometheusRule<br/>HighRequestRate]
+      am[Alertmanager<br/>Service port 9093]
+      amcfg[AlertmanagerConfig<br/>webhook or email routing]
+      gfdash[Grafana dashboards ConfigMap<br/>grafana_dashboard=1]
     end
   end
 
@@ -256,11 +256,11 @@ Grafana dashboards live in `grafana-dashboards/`. There is also a dashboard Conf
 
 ```mermaid
 flowchart LR
-  S[ServiceMonitor\n(frontend/model-service)] --> P[Prometheus\n(9090)]
-  P --> R[Rule evaluation\n(PrometheusRule)]
-  R -->|firing alerts| A[Alertmanager\n(9093)]
-  A -->|routes| W[Webhook receiver]
-  A -->|routes| E[Email receiver]
+  S["ServiceMonitor<br/>(frontend/model-service)"] --> P["Prometheus<br/>9090"]
+  P --> R["Rule evaluation<br/>(PrometheusRule)"]
+  R -->|firing alerts| A["Alertmanager<br/>9093"]
+  A -->|routes| W["Webhook receiver"]
+  A -->|routes| E["Email receiver"]
 ```
 
 ---
