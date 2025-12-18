@@ -1,295 +1,280 @@
-## Deployment documentation
+## Deployment documentation (final deployment)
 
-This document describes how the **SMS Spam Detection** system is deployed and routed in Kubernetes, including **Istio traffic management (canary + sticky sessions + rate limiting)** and **monitoring/alerting (Prometheus + Alertmanager)**.
+We are Team 23 in the DODA M.Sc. course. This document explains the *conceptual* deployment structure and the request/metrics flows of our final system so a new team member can participate in design discussions.
 
-- **Operations repo (this repo)**: Kubernetes/Helm/Ansible assets
-- **Frontend repo**: `https://github.com/doda25-team23/app`
-- **Model Service repo**: `https://github.com/doda25-team23/model-service`
+- **Ops repo (this repo)**: `https://github.com/doda25-team23/operation`
+- **Frontend**: `https://github.com/doda25-team23/app`
+- **Model service**: `https://github.com/doda25-team23/model-service`
 - **Versioning repo**: `https://github.com/doda25-team23/lib-version`
 
----
+### Scope and non-goals
 
-## Architecture overview (what exists in this repo)
-
-There are three “layers” you can deploy from this repository:
-
-- **Local**: `docker-compose.yml` (ports 8080/8081 on localhost)
-- **Kubernetes (raw manifests)**: `kubernetes/base/` (Ingress-NGINX -> `frontend`)
-- **Kubernetes (Helm)**:
-  - **App + Istio**: `helm-chart/` (Namespace + Deployments/Services + Istio Gateway/VS/DR + EnvoyFilter rate limit; optional Ingress)
-  - **Monitoring/Alerting**: `helm/app-stack/` (Prometheus Operator CRDs: `Prometheus`, `ServiceMonitor`, `PrometheusRule`, `Alertmanager`, `AlertmanagerConfig`, plus Services)
-
-In practice, the “full” architecture for A4-style deployments is:
-
-- **Application** via `helm-chart/` into namespace **`sms-app`**
-- **Monitoring/Alerting** via `helm/app-stack/` into a chosen namespace (often **`monitoring`**)
+- **In scope**: Kubernetes resources, Istio traffic management (canary + sticky sessions + rate limiting), monitoring and alerting (Prometheus + Alertmanager), and how they connect.
+- **Out of scope**: VM provisioning details and step-by-step installation commands.
 
 ---
 
-## Cluster prerequisites (lab environment)
+## System overview
 
-From `K8S_SETUP.md`, the Vagrant/Ansible lab provisions:
+Our system classifies SMS messages as **spam** vs **ham**.
 
-- **MetalLB** pool: `192.168.56.90-192.168.56.99`
-- **Ingress-NGINX** LoadBalancer IP: `192.168.56.90`
-- **Istio IngressGateway** LoadBalancer IP: `192.168.56.91`
-- **Istio** installed (IstioOperator), and namespaces can be labelled for sidecar injection
+- **Frontend**: web UI + request handling (HTTP)
+- **Model service**: ML inference API (HTTP)
+
+At runtime, the frontend calls the model service via an internal Kubernetes Service.
 
 ---
 
-## Architecture diagram (Kubernetes + Istio + monitoring)
+## Deployed resources (inventory)
+
+The final deployment consists of these resource groups:
+
+- **Workloads**
+  - **Deployments**: `frontend` and `model-service`, each in two versions (**v1** and **v2**) to enable canary experiments.
+  - **Pods**: each application pod has an **Istio sidecar** (`istio-proxy`) when the namespace has injection enabled.
+
+- **Service discovery**
+  - **Services** (ClusterIP): `frontend` and `model-service` (stable names; traffic routing selects pods by `version` label).
+
+- **External entry**
+  - **Istio Gateway**: public entrypoint for the experiment.
+  - (Optional) **Kubernetes Ingress** via Ingress-NGINX: a simpler entrypoint when Istio traffic management is not required.
+
+- **Traffic management (experiment logic)**
+  - **VirtualService (frontend)**: makes the routing decision (header override vs weighted canary split).
+  - **DestinationRule (frontend)**: defines subsets (v1/v2) and sticky-session policy.
+  - **VirtualService (model service)** and **DestinationRule (model service)**: mirror the same versioning logic for internal calls.
+
+- **Resilience / “additional use case”**
+  - **EnvoyFilter**: local rate limiting on frontend inbound traffic (returns HTTP 429 when exceeded).
+
+- **Observability**
+  - **ServiceMonitor** (frontend + model-service): Prometheus target discovery.
+  - **Prometheus**: scraping + rule evaluation.
+  - **PrometheusRule**: alert definition (e.g., high request rate).
+  - **Alertmanager** + **AlertmanagerConfig**: alert routing to webhook/email.
+  - **Grafana dashboards**: JSON dashboards provided in the repo (imported via ConfigMap in a Grafana setup).
+
+---
+
+## Architecture diagram (resources and connections)
 
 ```mermaid
 flowchart TB
-  %% External
-  user[Client / Browser / curl]
+  %% external
+  C["Client<br/>Browser or curl"]
 
-  %% Cluster ingress
-  subgraph cluster[Kubernetes cluster]
+  %% cluster boundary
+  subgraph K["Kubernetes cluster"]
     direction TB
 
-    subgraph istio_ns[Namespace: istio-system]
-      igw[Service: istio-ingressgateway<br/>LB IP: 192.168.56.91<br/>Port: 80]
+    %% ingress plane
+    IGW["Istio IngressGateway Service<br/>Port 80"]
+    NGINX["Ingress-NGINX Controller Service<br/>Port 80"]
+
+    %% application namespace
+    subgraph NS["Namespace sms-app<br/>Istio sidecar injection enabled"]
+      direction TB
+
+      %% traffic mgmt objects
+      GW["Istio Gateway<br/>Hosts: app.sms-detector.local, canary.sms-detector.local"]
+      VSFE["VirtualService frontend<br/>Header override + weighted canary"]
+      DRFE["DestinationRule frontend<br/>Subsets v1/v2 + sticky sessions"]
+
+      VSMS["VirtualService model-service<br/>Header override + weighted canary"]
+      DRMS["DestinationRule model-service<br/>Subsets v1/v2 + sticky sessions"]
+
+      %% services
+      SFE["Service frontend<br/>Port 8080"]
+      SMS["Service model-service<br/>Port 8081"]
+
+      %% workloads
+      FE1["Pods frontend v1<br/>app container + istio-proxy"]
+      FE2["Pods frontend v2<br/>app container + istio-proxy"]
+      MS1["Pods model-service v1<br/>app container + istio-proxy"]
+      MS2["Pods model-service v2<br/>app container + istio-proxy"]
+
+      %% extra use case
+      RL["EnvoyFilter local rate limit<br/>Applied to frontend inbound"]
     end
 
-    subgraph nginx_ns[Namespace: ingress-nginx]
-      nginx[Service: ingress-nginx-controller<br/>LB IP: 192.168.56.90<br/>Port: 80]
-    end
-
-    subgraph appns[Namespace: sms-app<br/>label: istio-injection=enabled]
-      fe_svc[Service: frontend<br/>Port 8080]
-      ms_svc[Service: model-service<br/>Port 8081]
-
-      fe_v1[Pods: frontend v1<br/>containerPort 8080<br/>+ istio-proxy]
-      fe_v2[Pods: frontend v2<br/>containerPort 8080<br/>+ istio-proxy]
-
-      ms_v1[Pods: model-service v1<br/>containerPort 8081<br/>+ istio-proxy]
-      ms_v2[Pods: model-service v2<br/>containerPort 8081<br/>+ istio-proxy]
-
-      %% Istio traffic management resources
-      gw[Istio Gateway<br/>port 80<br/>hosts: app.sms-detector.local, canary.sms-detector.local]
-      vs_fe[VirtualService: frontend<br/>weighted routing + x-version override]
-      dr_fe[DestinationRule: frontend<br/>subsets v1/v2 + sticky sessions]
-      vs_ms[VirtualService: model-service<br/>weighted routing + x-version override]
-      dr_ms[DestinationRule: model-service<br/>subsets v1/v2 + sticky sessions]
-
-      %% Rate limit
-      rl[EnvoyFilter: local rate limit<br/>workloadSelector app=frontend]
-    end
-
-    subgraph mon[Monitoring and Alerting - Prometheus Operator]
-      sm[ServiceMonitors<br/>frontend and model-service]
-      prom[Prometheus<br/>Service port 9090]
-      rule[PrometheusRule<br/>HighRequestRate]
-      am[Alertmanager<br/>Service port 9093]
-      amcfg[AlertmanagerConfig<br/>webhook or email routing]
-      gfdash[Grafana dashboards ConfigMap<br/>grafana_dashboard=1]
+    %% monitoring group
+    subgraph MON["Monitoring and alerting<br/>Prometheus Operator"]
+      direction TB
+      SMON["ServiceMonitors<br/>Discover metrics endpoints"]
+      PROM["Prometheus<br/>Scrape + evaluate rules"]
+      PRULE["PrometheusRule<br/>Alert conditions"]
+      AM["Alertmanager<br/>Route notifications"]
+      AMCFG["AlertmanagerConfig<br/>Webhook or email"]
     end
   end
 
-  %% External routes
-  user -->|HTTP 80 + Host header| igw
-  user -->|HTTP 80 + Host header| nginx
+  %% external paths
+  C -->|"HTTP 80 + Host header"| IGW
+  C -->|"HTTP 80 + Host header"| NGINX
 
-  %% Istio path
-  igw --> gw --> vs_fe --> fe_svc
-  dr_fe -. subsets .- vs_fe
-  fe_svc --> fe_v1
-  fe_svc --> fe_v2
+  %% istio experiment path
+  IGW --> GW --> VSFE --> SFE
+  DRFE -. "subsets + stickiness" .- VSFE
 
-  %% Internal service call
-  fe_v1 -->|MODEL_HOST=http://model-service:8081| ms_svc
-  fe_v2 -->|MODEL_HOST=http://model-service:8081| ms_svc
+  %% service to pods
+  SFE --> FE1
+  SFE --> FE2
 
-  dr_ms -. subsets .- vs_ms
-  ms_svc -->|port 8081| ms_v1
-  ms_svc -->|port 8081| ms_v2
+  %% internal call
+  FE1 -->|"HTTP to model-service:8081"| SMS
+  FE2 -->|"HTTP to model-service:8081"| SMS
 
-  %% Rate limiting applied at frontend sidecar inbound
-  rl -. injected filter .- fe_v1
-  rl -. injected filter .- fe_v2
+  %% model-service routing
+  DRMS -. "subsets + stickiness" .- VSMS
+  SMS --> MS1
+  SMS --> MS2
 
-  %% Monitoring flow
-  sm --> prom
-  rule --> prom
-  prom -->|alerts| am
-  amcfg -. selected by .- am
-  gfdash -. imported by .- mon
+  %% rate limiting is applied at frontend inbound
+  RL -. "rate limit filter" .- FE1
+  RL -. "rate limit filter" .- FE2
+
+  %% monitoring connections
+  SMON --> PROM
+  PRULE --> PROM
+  PROM -->|"firing alerts"| AM
+  AMCFG -. "selected by" .- AM
 ```
 
 ---
 
-## Request flow (client → gateway → services)
+## Access contract: hostnames, ports, paths, headers
 
-### A) Istio Gateway flow (recommended for A4 canary + sticky sessions)
+This section answers “what do I need to send to reach the application?”
 
-1. **Client** calls `http://app.sms-detector.local/` (or `http://canary.sms-detector.local/`)
-2. DNS/hosts entry resolves the hostname to the **Istio IngressGateway** IP (lab default: `192.168.56.91`)
-3. `Gateway` (port **80**) accepts hosts:
-   - `app.sms-detector.local`
-   - `canary.sms-detector.local`
-4. `VirtualService` (`sms-app-frontend`) makes the routing decision:
-   - If request has **header** `x-version: v1` → route to subset **v1**
-   - If request has **header** `x-version: v2` → route to subset **v2**
-   - Otherwise → weighted split **v1/v2** (`istio.trafficSplit.stable/canary`)
-5. `DestinationRule` enforces **sticky sessions**:
-   - default: consistent hash on cookie `sms-app-version` (TTL `3600s`)
-   - alternative: consistent hash on header `x-user-id`
-6. Frontend pod calls model service using `MODEL_HOST=http://model-service:8081`
-   - Model service has its own `VirtualService` + `DestinationRule` so version selection can mirror the frontend behavior.
+### Hostnames
+
+- **Stable host**: `app.sms-detector.local`
+- **Canary host**: `canary.sms-detector.local`
+
+These hostnames are used by the Istio Gateway’s `hosts` list and by the frontend VirtualService’s `hosts` list.
+
+### Ports
+
+- **External**: HTTP **80** (via Istio IngressGateway)
+- **Internal**:
+  - `frontend` Service: **8080**
+  - `model-service` Service: **8081**
+
+### Paths
+
+- **Web UI**: `/sms`
+- **Model service API docs**: `/apidocs` (on the model-service)
+- **Metrics**:
+  - frontend: `/actuator/prometheus`
+  - model-service: `/metrics`
+
+### Headers and cookies (experiment controls)
+
+- **Force version** (routing override at VirtualService): `x-version: v1` or `x-version: v2`
+- **Sticky sessions** (routing stabilization at DestinationRule):
+  - default: cookie `sms-app-version` (hash key)
+  - alternative: header `x-user-id` (hash key)
+
+---
+
+## Request flow (typical request path)
+
+### What happens on the way in?
+
+1. A request hits the **Istio IngressGateway** (port 80) with a specific **Host header**.
+2. The **Istio Gateway** accepts the request for our hostnames.
+3. The **frontend VirtualService** takes the **routing decision**:
+   - first: check header override `x-version`
+   - else: apply **weighted split** between subsets v1/v2
+4. The **frontend DestinationRule** applies **sticky sessions** so repeated requests from the same client tend to stay on the same subset.
+
+### What happens inside the mesh?
+
+5. The selected frontend pod calls the model service using the internal service name (`http://model-service:8081`).
+6. The model service has its own VirtualService/DestinationRule so that the **same versioning mechanism** can be applied for internal calls.
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant C as Client
-  participant IGW as Istio IngressGateway (80)
-  participant GW as Gateway (sms-app-gateway)
-  participant VS as VirtualService (frontend)
-  participant FE as Service frontend:8080
-  participant POD as frontend pod (v1/v2)
-  participant MS as Service model-service:8081
-  participant MSP as model-service pod (v1/v2)
+  participant U as Client
+  participant IGW as Istio IngressGateway:80
+  participant GW as Gateway
+  participant VS as VirtualService frontend
+  participant DR as DestinationRule frontend
+  participant SFE as Service frontend:8080
+  participant FE as Frontend pod (v1 or v2)
+  participant SMS as Service model-service:8081
+  participant MS as Model-service pod (v1 or v2)
 
-  C->>IGW: GET / (Host: app.sms-detector.local)
-  IGW->>GW: matched server hosts
-  GW->>VS: route decision
-  alt x-version=v2
-    VS->>FE: subset v2
-  else x-version=v1
-    VS->>FE: subset v1
+  U->>IGW: GET /sms (Host: app.sms-detector.local)
+  IGW->>GW: host accepted
+  GW->>VS: evaluate routes
+
+  alt x-version header present
+    VS-->>SFE: route to subset from header
   else no override
-    VS->>FE: weighted split (stable/canary)
+    VS-->>SFE: weighted 90/10 split (v1/v2)
   end
-  FE->>POD: pick pod (sticky by cookie/header)
-  POD->>MS: HTTP call (MODEL_HOST)
-  MS->>MSP: pick pod (sticky by cookie/header)
-  MSP-->>POD: response
-  POD-->>C: response
+
+  DR-->>SFE: apply sticky sessions (cookie or header hash)
+  SFE->>FE: select pod
+
+  FE->>SMS: HTTP call for classification
+  SMS->>MS: select pod (v1 or v2)
+  MS-->>FE: response
+  FE-->>U: render result
 ```
-
-### B) Ingress-NGINX flow (simple ingress)
-
-If you use `kubernetes/base/` or `helm-chart` with `ingress.enabled=true` (and route to the NGINX LB IP `192.168.56.90`), the flow is:
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant C as Client
-  participant N as Ingress-NGINX (80)
-  participant I as Ingress resource
-  participant FE as Service frontend:8080
-  participant POD as frontend pod
-  participant MS as Service model-service:8081
-
-  C->>N: GET / (Host: app.sms-detector.local)
-  N->>I: match host + path
-  I->>FE: forward
-  FE->>POD: choose backend pod
-  POD->>MS: call MODEL_HOST
-  POD-->>C: response
-```
-
-**Note**: In this repo, Istio canary routing is implemented via the **Istio Gateway/VirtualService/DestinationRule** resources in `helm-chart/templates/`. If you only go through NGINX ingress, you bypass the external Istio gateway routing logic.
 
 ---
 
-## Hostnames, ports, routing decisions, and “where is the use case?”
+## Experimental design: where is the 90/10 split and where is the decision taken?
 
-### Hostnames (what you put in DNS or `/etc/hosts`)
+### Where is the 90/10 configured?
 
-- **Stable app**: `app.sms-detector.local` (default in `helm-chart/values.yaml`)
-- **Canary app**: `canary.sms-detector.local` (default in `helm-chart/values.yaml`)
-- **Monitoring example host**: `app.team23.doda.local` (used by `helm/app-stack/values.yaml` ingress example)
+- The **weights** live in the **frontend VirtualService** as two routes: subset v1 with weight 90, subset v2 with weight 10.
+- We parameterize these values through Helm values (stable/canary percentages), but conceptually the *VirtualService* is the resource that encodes the split.
 
-In the lab environment, these hostnames usually map to:
+### Where is the routing decision taken?
 
-- `app.sms-detector.local` → `192.168.56.91` (Istio Gateway) **or** `192.168.56.90` (Ingress-NGINX)
-- `canary.sms-detector.local` → `192.168.56.91` (Istio Gateway)
+- **Primary decision point**: **VirtualService (frontend)**
+  - applies header overrides first
+  - otherwise applies weighted routing
+- **Stabilization**: **DestinationRule (frontend)**
+  - consistent-hash policy implements sticky sessions
 
-### Ports (externally and internally)
+### Which component implements the additional use case?
 
-- **Frontend**:
-  - container: **8080**
-  - service (Helm `helm-chart/`): **8080**
-  - service (monitoring chart `helm/app-stack/`): **80** → targetPort `http` → container **8080**
-- **Model service**:
-  - container: **8081**
-  - service: **8081**
-- **Istio IngressGateway**: **80** (HTTP)
-- **Ingress-NGINX**: **80** (HTTP)
-- **Prometheus service**: **9090**
-- **Alertmanager service**: **9093**
-
-### Routing decisions (Istio)
-
-- **Canary split**: `istio.trafficSplit.stable` / `istio.trafficSplit.canary` (must sum to 100)
-- **Explicit override**: header `x-version: v1|v2`
-- **Sticky sessions** (DestinationRule consistent hashing):
-  - cookie-based (`sms-app-version`, TTL `3600s`) **or**
-  - header-based (`x-user-id`)
-- **Rate limiting**: Envoy `local_ratelimit` filter injected on **frontend inbound** sidecar, configured by:
-  - `rateLimit.maxTokens`, `rateLimit.tokensPerFill`, `rateLimit.fillInterval`
-  - when exceeded: HTTP **429**, plus response header `x-local-rate-limit: true`
-
-### Where is the “use case” reachable?
-
-- **Web UI use case**: `http://<host>:80/sms` (documented in `README.md` as the UI entrypoint)
-- **Model service API docs**: `http://<model-service>:8081/apidocs`
-- **Metrics** (for monitoring chart `helm/app-stack/`):
-  - frontend (Spring Boot Actuator): `http://frontend:<port>/actuator/prometheus`
-  - model-service: `http://model-service:8081/metrics`
+- **Rate limiting** is implemented by an **EnvoyFilter** that inserts Envoy’s `local_ratelimit` HTTP filter on **frontend inbound** traffic.
+- Behavior: requests exceeding the token bucket are rejected with **HTTP 429**.
 
 ---
 
-## Monitoring & alerting flow
+## Monitoring and alerting flow
 
-This repo’s monitoring stack is expressed as **Prometheus Operator CRDs** in `helm/app-stack/templates/`:
+We monitor both services via Prometheus and route alerts through Alertmanager.
 
-- `ServiceMonitor` discovers `frontend` and `model-service` Services via labels, and scrapes metrics endpoints
-- `PrometheusRule` defines alert(s), e.g. `HighRequestRate`
-- `Prometheus` evaluates rules and sends alerts to `Alertmanager`
-- `AlertmanagerConfig` chooses delivery method:
-  - webhook (recommended for testing)
-  - email (requires SMTP secret)
-
-Grafana dashboards live in `grafana-dashboards/`. There is also a dashboard ConfigMap *template* at `kubernetes/grafana-dashboard-configmap.yaml` (it contains Helm templating like `.Files.Get`), so it must be rendered as part of a Helm chart (or replaced with literal JSON) before applying directly with `kubectl`.
+- **Discovery**: ServiceMonitors select service endpoints to scrape.
+- **Scraping**: Prometheus scrapes metrics periodically.
+- **Alerting**: PrometheusRules define alert conditions; firing alerts go to Alertmanager.
+- **Notification**: AlertmanagerConfig routes alerts to webhook (for testing) or email (for production-like setup).
 
 ```mermaid
 flowchart LR
-  S["ServiceMonitor<br/>(frontend/model-service)"] --> P["Prometheus<br/>9090"]
-  P --> R["Rule evaluation<br/>(PrometheusRule)"]
-  R -->|firing alerts| A["Alertmanager<br/>9093"]
-  A -->|routes| W["Webhook receiver"]
-  A -->|routes| E["Email receiver"]
+  SM["ServiceMonitor<br/>selects scrape targets"] --> P["Prometheus<br/>scrapes metrics"]
+  P --> R["PrometheusRule<br/>evaluates conditions"]
+  R -->|"alert fires"| A["Alertmanager<br/>groups and routes"]
+  A --> W["Webhook receiver"]
+  A --> E["Email receiver"]
 ```
 
 ---
 
-## Deployment inputs (what you typically configure)
+## References inside the repo (details)
 
-### App deployment (`helm-chart/`)
+We avoid embedding YAML here; use these references when you need implementation details:
 
-- **Hostnames**: `ingress.hosts.*` and `istio.hosts.*`
-- **Traffic split**: `istio.trafficSplit.*`
-- **Sticky sessions**: `istio.stickySession.*`
-- **Image tags**: `frontend.image.tag`, `modelService.image.tag`
-- **Registry auth**: `imagePullSecrets` (e.g., `ghcr-secret`)
-
-### Monitoring/alerting (`helm/app-stack/`)
-
-- **Alert delivery**:
-  - webhook URL: `alerting.webhook.url`
-  - (optional) email settings + secret
-- **Scrape config**: `monitoring.labels` and `monitoring.scrapeInterval`
-
----
-
-## Useful verification commands
-
-- **App + Istio resources**:
-  - `kubectl get pods,svc,ingress -n sms-app`
-  - `kubectl get gateway,virtualservice,destinationrule,envoyfilter -n sms-app`
-
-- **Monitoring resources**:
-  - `kubectl get prometheus,servicemonitor,prometheusrule -A`
-  - `kubectl get alertmanager,alertmanagerconfig -A`
+- **Application chart + Istio experiment**: `helm-chart/`
+- **Monitoring and alerting chart**: `helm/app-stack/`
+- **Dashboards**: `grafana-dashboards/`
+- **Legacy/raw manifests**: `kubernetes/base/`
