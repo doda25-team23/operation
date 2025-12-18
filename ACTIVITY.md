@@ -229,3 +229,16 @@ PR: https://github.com/doda25-team23/operation/pull/11
 
 ### Brewen
 
+Started the A4 “final deployment documentation” effort by reviewing the *full* operations architecture across all deployment paths (raw `kubernetes/base`, app Helm chart `helm-chart/`, and monitoring/alerting Helm chart `helm/app-stack/`). Extracted the concrete experiment-relevant interfaces (hostnames, ports, paths, headers, cookies) and mapped the routing responsibilities between Istio Gateway, VirtualService (routing decision), and DestinationRule (sticky sessions). Drafted the initial versions of `docs/deployment.md` and `docs/extension.md` with Mermaid diagrams for the resource topology and request flow, including an explicit explanation of where the 90/10 split is configured and where the routing decision is taken.
+
+---
+
+## Week 6
+
+### Brewen
+
+Finalized and polished the documentation deliverables in `docs/` for the course hand-in. Refactored `docs/deployment.md` to be **conceptual** (no YAML dumps), complete (includes *all* deployed resource groups, not only request-serving components), and readable to an outsider/new team member. Improved the experimental narrative by clearly separating (i) the access contract (hostnames/ports/paths/headers), (ii) the request path through the cluster, and (iii) the experimental design (90/10 canary split + routing decision points + sticky session stabilization). Also fixed Mermaid rendering issues by replacing fragile label formatting and using `<br/>` line breaks for compatibility.
+
+Reworked `docs/extension.md` into a concrete, release-engineering-focused proposal framed as “our next assignment”: making canary experiments reproducible by enforcing immutable version selection (avoid `latest`, prefer pinned tags/digests), introducing a lightweight experiment release manifest, and adding a small CI validation gate. Added a measurement plan that evaluates impact on reproducibility, configuration-induced failures, and DORA/Four Keys-aligned outcomes (especially change failure rate), with links to high-quality sources (Kubernetes image docs, image digests guidance, DORA report, and SRE canarying discussion).
+
+PR: https://github.com/doda25-team23/operation/pull/12
