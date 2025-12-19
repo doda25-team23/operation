@@ -235,6 +235,12 @@ Started the A4 “final deployment documentation” effort by reviewing the *ful
 
 ## Week 6
 
+### Radu
+
+Added a plan for continuous experimentation and worked on getting the png and the info necessary to experiment + realized we got rid somehow (was a conflict) of the ssh keys, so added them back.
+
+PR: https://github.com/doda25-team23/operation/pull/13 
+
 ### Brewen
 
 Finalized and polished the documentation deliverables in `docs/` for the course hand-in. Refactored `docs/deployment.md` to be **conceptual** (no YAML dumps), complete (includes *all* deployed resource groups, not only request-serving components), and readable to an outsider/new team member. Improved the experimental narrative by clearly separating (i) the access contract (hostnames/ports/paths/headers), (ii) the request path through the cluster, and (iii) the experimental design (90/10 canary split + routing decision points + sticky session stabilization). Also fixed Mermaid rendering issues by replacing fragile label formatting and using `<br/>` line breaks for compatibility.
