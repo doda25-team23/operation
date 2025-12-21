@@ -1,6 +1,13 @@
 apiVersion: v2
 name: app-stack
-description: Helm chart for our REMLA application stack
+description: Monitoring and alerting stack for SMS Spam Detection Application (Prometheus, AlertManager, ServiceMonitors)
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+keywords:
+  - monitoring
+  - prometheus
+  - alertmanager
+  - observability
+maintainers:
+  - name: DODA25-Team23
