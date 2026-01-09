@@ -251,3 +251,16 @@ CHART SEPARATION:
 └─────────────────────────┴──────────────────────────────────────┘
 
 PR: https://github.com/doda25-team23/operation/pull/14
+
+## Week 7
+
+### Radu
+
+This PR https://github.com/doda25-team23/operation/pull/15 addresses peer review feedback by improving documentation discoverability and clarifying traffic management and rate limiting behavior.
+
+What has been done to satisfy some of the issues I've seen persistent with the reviewers: 
+
+- Fixed a typo in the continuous experimentation document name and improved its discoverability
+- Added a canonical Traffic Management document consolidating canary routing, sticky sessions, and header overrides
+- Converted raw reference URLs in documentation into proper hyperlinks
+- Extended the rate limiting Helm configuration to support both sidecar-level and ingress gateway–level throttling via a configurable scope
