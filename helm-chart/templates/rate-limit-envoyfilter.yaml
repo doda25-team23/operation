@@ -1,37 +1,36 @@
+{{- if .Values.rateLimit.enabled }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: {{ include "sms-app.fullname" . }}-rate-limit
-  namespace: {{ .Values.namespace }}
-  labels:
-    {{- include "sms-app.labels" . | nindent 4 }}
+  name: rate-limit
+  namespace: {{ .Release.Namespace }}
 spec:
+  {{- if eq .Values.rateLimit.scope "gateway" }}
   workloadSelector:
     labels:
-      app: {{ .Values.frontend.service.name }}
+{{ toYaml .Values.rateLimit.gatewaySelector | indent 6 }}
+  {{- end }}
   configPatches:
-  - applyTo: HTTP_FILTER
-    match:
-      context: SIDECAR_INBOUND
-      listener:
-        filterChain:
-          filter:
-            name: "envoy.filters.network.http_connection_manager"
-            subFilter:
-              name: "envoy.filters.http.router"
-    patch:
-      operation: INSERT_BEFORE
-      value:
-        name: envoy.filters.http.local_ratelimit
-        typed_config:
-          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-          type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-          value:
+    - applyTo: HTTP_FILTER
+      match:
+        context: {{ ternary "GATEWAY" "SIDECAR_INBOUND" (eq .Values.rateLimit.scope "gateway") }}
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
             stat_prefix: http_local_rate_limiter
             token_bucket:
               max_tokens: {{ .Values.rateLimit.maxTokens }}
               tokens_per_fill: {{ .Values.rateLimit.tokensPerFill }}
-              fill_interval: {{ .Values.rateLimit.fillInterval }}
+              fill_interval: {{ .Values.rateLimit.fillInterval | quote }}
             filter_enabled:
               runtime_key: local_rate_limit_enabled
               default_value:
@@ -43,7 +42,7 @@ spec:
                 numerator: 100
                 denominator: HUNDRED
             response_headers_to_add:
-              - append: false
-                header:
+              - header:
                   key: x-local-rate-limit
-                  value: 'true'
+                  value: "true"
+{{- end }}
