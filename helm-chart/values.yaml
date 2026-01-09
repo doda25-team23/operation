@@ -187,6 +187,14 @@ rateLimit:
   fillInterval: "60s"
   # This configuration allows 10 requests per minute globally
 
+  # -- sidecar: per-pod (current behavior)
+  # -- gateway: at ingressgateway (closer to "global" throttling)
+  scope: sidecar
+
+  # -- only used when scope=gateway
+  gatewaySelector:
+    istio: ingressgateway
+
 # Istio configuration (A4 - Traffic Management & Canary Release)
 istio:
   # -- Enable Istio Gateway and traffic management
