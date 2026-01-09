@@ -124,3 +124,13 @@ Add your configuration to `values.yaml` in the placeholder sections.
 2. Add values to `values.yaml`
 3. Update Chart version in `Chart.yaml`
 4. Test with `helm lint` and `helm template`
+
+## A4 Deliverables (Docs)
+
+- Traffic Management: docs/traffic-management.md
+- Additional Use Case (Rate Limiting): docs/rate-limiting.md
+- Continuous Experimentation: docs/continuous-experimentation.md
+- Deployment Documentation: docs/deployment.md
+- Extension Proposal: docs/extension.md
+- Validation / testing: ISTIO_TESTING.md
+

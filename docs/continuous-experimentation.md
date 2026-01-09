@@ -88,7 +88,12 @@ Our Grafana dashboard supports the decision by directly comparing v1 and v2 metr
 
 ### Screenshot evidence
 
-> **Screenshot:** `docs/images/continuous-experimentation-dashboard.png`
+> TODO: Add Grafana screenshots after executing the experiment run.
+> Expected files:
+> - docs/images/ce-traffic-split.png
+> - docs/images/ce-latency-v1-v2.png
+> - docs/images/ce-error-rate-v1-v2.png
+
 
 ---
 
