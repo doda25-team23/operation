@@ -1,0 +1,156 @@
+# Production values for sms-app Helm chart
+# Override default values for production deployment
+# Usage: helm install sms-app ./helm-chart -f values-production.yaml
+
+# Application namespace
+namespace: sms-app
+
+# Image pull secrets for private GitHub Container Registry
+imagePullSecrets:
+  - name: ghcr-secret
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    stable: app.sms-detector.local
+    canary: canary.sms-detector.local
+  tls:
+    - secretName: sms-app-tls
+      hosts:
+        - app.sms-detector.local
+        - canary.sms-detector.local
+
+# Frontend service configuration - PRODUCTION
+frontend:
+  replicaCount: 3  # Increased for high availability
+  version: v1
+  
+  image:
+    repository: ghcr.io/doda25-team23/app
+    tag: "1.0.5"  # Pin specific version, avoid :latest in production
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    name: frontend
+    port: 8080
+    targetPort: 8080
+  
+  resources:
+    requests:
+      memory: "512Mi"  # Increased for production load
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  
+  livenessProbe:
+    enabled: true
+    path: /actuator/health
+    port: 8080
+    initialDelaySeconds: 45
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    enabled: true
+    path: /actuator/health/readiness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Model service configuration - PRODUCTION
+modelService:
+  replicaCount: 3  # Increased for high availability
+  version: v1
+  
+  image:
+    repository: ghcr.io/doda25-team23/model-service
+    tag: "0.2.8"  # Pin specific version
+    pullPolicy: IfNotPresent
+  
+  model:
+    version: "v1.2.3"
+    baseUrl: "https://github.com/doda25-team23/model-service/releases/download"
+    dir: "/app/model"
+  
+  service:
+    type: ClusterIP
+    name: model-service
+    port: 8081
+    targetPort: 8081
+  
+  resources:
+    requests:
+      memory: "1Gi"  # Increased for ML model
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  
+  volume:
+    enabled: true
+    hostPath: /mnt/shared
+    mountPath: /app/shared
+  
+  livenessProbe:
+    enabled: true
+    path: /health
+    port: 8081
+    initialDelaySeconds: 90
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    enabled: true
+    path: /health
+    port: 8081
+    initialDelaySeconds: 60
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# ConfigMap
+config:
+  logLevel: "WARN"  # Less verbose in production
+  featureFlagExample: "false"
+
+# Rate limiting - Production tuned
+rateLimit:
+  enabled: true
+  maxTokens: 50  # Higher limit for production traffic
+  tokensPerFill: 50
+  fillInterval: "60s"
+  scope: gateway  # Gateway-level for better protection
+  gatewaySelector:
+    istio: ingressgateway
+
+# Istio configuration - Production canary
+istio:
+  enabled: true
+  
+  ingressGateway:
+    name: ingressgateway
+  
+  hosts:
+    stable: app.sms-detector.local
+    canary: canary.sms-detector.local
+  
+  trafficSplit:
+    stable: 95  # Conservative canary in production
+    canary: 5
+  
+  stickySession:
+    useCookie: true
+    cookieName: sms-app-version
+    cookieTTL: 7200s  # 2 hours for better user experience
+    headerName: x-user-id
