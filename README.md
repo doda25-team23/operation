@@ -16,54 +16,39 @@ The system classifies SMS messages as spam or legitimate (ham) using machine lea
 - Version Library: https://github.com/doda25-team23/lib-version
 - Operations: https://github.com/doda25-team23/operation
 
+## Documentation
+
+- [QUICKSTART.md](QUICKSTART.md) - Get started quickly with different deployment options
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
+- [docs/deployment.md](docs/deployment.md) - Architecture and deployment details
+- [docs/traffic-management.md](docs/traffic-management.md) - Istio canary configuration
+- [docs/continuous-experimentation.md](docs/continuous-experimentation.md) - A/B testing guide
+
 ## Quick Start
+
+See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
 
 ### Docker Compose (Local Development)
 
 ```bash
-cd operation
-docker-compose up -d
+make compose-up
 ```
 
 Access:
-- Web UI: http://localhost:8080/sms
+- Web UI: http://localhost:8080
 - API Docs: http://localhost:8081/apidocs
 
-### Kubernetes with Helm (Production)
-
-**Prerequisites:**
-- Kubernetes cluster with Istio installed
-- Helm 3.x
-- kubectl configured
-
-**Deploy:**
+### Kubernetes with Helm
 
 ```bash
-# Create namespace with Istio injection
-kubectl create namespace sms-app
-kubectl label namespace sms-app istio-injection=enabled
+# Install application
+make k8s-app-install
 
-# Create image pull secret for GitHub Container Registry
-kubectl create secret docker-registry ghcr-secret \
-  --docker-server=ghcr.io \
-  --docker-username=YOUR_GITHUB_USERNAME \
-  --docker-password=YOUR_PERSONAL_ACCESS_TOKEN \
-  --docker-email=your-email@example.com \
-  -n sms-app
+# Validate deployment
+make validate-canary
 
-# Install with Helm
-cd operation
-helm install sms-app ./helm-chart -n sms-app --create-namespace
-
-# Access application (requires minikube tunnel or ingress controller)
-# URL: http://app.sms-detector.local
-```
-
-**Verify deployment:**
-
-```bash
-kubectl get pods -n sms-app
-kubectl get ingress -n sms-app
+# Install monitoring
+make k8s-mon-install
 ```
 
 ## Container Images
