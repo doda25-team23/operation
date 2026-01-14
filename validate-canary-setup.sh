@@ -1,128 +1,157 @@
 #!/bin/bash
-# Quick validation script for Istio canary deployment setup
+# Validation script for Istio canary deployment setup
 # Usage: ./validate-canary-setup.sh [namespace]
 
 set -e
 
 NAMESPACE="${1:-sms-app}"
+ERRORS=0
+WARNINGS=0
 
-echo "=== Validating Canary Deployment Setup in namespace: $NAMESPACE ==="
+echo "Validating Canary Deployment Setup"
+echo "Namespace: $NAMESPACE"
+echo "-----------------------------------"
 echo
 
 # Check if namespace exists
 if ! kubectl get namespace "$NAMESPACE" &>/dev/null; then
-    echo "❌ Namespace $NAMESPACE does not exist"
+    echo "[ERROR] Namespace $NAMESPACE does not exist"
     exit 1
 fi
-echo "✅ Namespace $NAMESPACE exists"
+echo "[OK] Namespace exists"
 
 # Check Istio injection
 INJECTION=$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels.istio-injection}' 2>/dev/null || echo "")
 if [ "$INJECTION" = "enabled" ]; then
-    echo "✅ Istio injection enabled"
+    echo "[OK] Istio injection enabled"
 else
-    echo "⚠️  Istio injection not enabled (label: istio-injection=enabled)"
+    echo "[WARN] Istio injection not enabled (missing label istio-injection=enabled)"
+    ((WARNINGS++))
 fi
 
 # Check deployments
 echo
-echo "=== Deployments ==="
-DEPLOYMENTS=$(kubectl get deployments -n "$NAMESPACE" -o name 2>/dev/null | wc -l)
+echo "Deployments:"
+DEPLOYMENTS=$(kubectl get deployments -n "$NAMESPACE" -o name 2>/dev/null | wc -l | tr -d ' ')
 if [ "$DEPLOYMENTS" -gt 0 ]; then
-    kubectl get deployments -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,VERSION:.metadata.labels.version,REPLICAS:.status.replicas,READY:.status.readyReplicas
-    echo "✅ Found $DEPLOYMENTS deployment(s)"
+    kubectl get deployments -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,VERSION:.metadata.labels.version,REPLICAS:.status.replicas,READY:.status.readyReplicas 2>/dev/null
+    echo "[OK] Found $DEPLOYMENTS deployment(s)"
 else
-    echo "❌ No deployments found"
+    echo "[ERROR] No deployments found"
+    ((ERRORS++))
 fi
 
 # Check for version labels
 echo
-echo "=== Version Labels ==="
-V1_PODS=$(kubectl get pods -n "$NAMESPACE" -l version=v1 --no-headers 2>/dev/null | wc -l)
-V2_PODS=$(kubectl get pods -n "$NAMESPACE" -l version=v2 --no-headers 2>/dev/null | wc -l)
+echo "Version Distribution:"
+V1_PODS=$(kubectl get pods -n "$NAMESPACE" -l version=v1 --no-headers 2>/dev/null | wc -l | tr -d ' ')
+V2_PODS=$(kubectl get pods -n "$NAMESPACE" -l version=v2 --no-headers 2>/dev/null | wc -l | tr -d ' ')
 echo "  v1 pods: $V1_PODS"
 echo "  v2 pods: $V2_PODS"
 
 if [ "$V1_PODS" -gt 0 ] && [ "$V2_PODS" -gt 0 ]; then
-    echo "✅ Both v1 and v2 versions deployed (canary ready)"
+    echo "[OK] Both versions deployed"
 elif [ "$V1_PODS" -gt 0 ]; then
-    echo "⚠️  Only v1 deployed (no canary)"
+    echo "[WARN] Only v1 deployed, no canary"
+    ((WARNINGS++))
 else
-    echo "⚠️  Version labels not found"
+    echo "[WARN] Version labels not found"
+    ((WARNINGS++))
 fi
 
 # Check Istio resources
 echo
-echo "=== Istio Resources ==="
+echo "Istio Resources:"
 
-GATEWAYS=$(kubectl get gateway -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
+GATEWAYS=$(kubectl get gateway -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
 echo "  Gateways: $GATEWAYS"
-[ "$GATEWAYS" -gt 0 ] && echo "✅ Gateway configured" || echo "⚠️  No Gateway found"
+if [ "$GATEWAYS" -gt 0 ]; then
+    echo "  [OK] Gateway configured"
+else
+    echo "  [WARN] No Gateway found"
+    ((WARNINGS++))
+fi
 
-VS=$(kubectl get virtualservice -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
+VS=$(kubectl get virtualservice -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
 echo "  VirtualServices: $VS"
-[ "$VS" -gt 0 ] && echo "✅ VirtualService configured" || echo "⚠️  No VirtualService found"
+if [ "$VS" -gt 0 ]; then
+    echo "  [OK] VirtualService configured"
+else
+    echo "  [WARN] No VirtualService found"
+    ((WARNINGS++))
+fi
 
-DR=$(kubectl get destinationrule -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
+DR=$(kubectl get destinationrule -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
 echo "  DestinationRules: $DR"
-[ "$DR" -gt 0 ] && echo "✅ DestinationRule configured" || echo "⚠️  No DestinationRule found"
+if [ "$DR" -gt 0 ]; then
+    echo "  [OK] DestinationRule configured"
+else
+    echo "  [WARN] No DestinationRule found"
+    ((WARNINGS++))
+fi
 
 # Check traffic split configuration
 echo
-echo "=== Traffic Split Configuration ==="
+echo "Traffic Split:"
 if [ "$VS" -gt 0 ]; then
     FRONTEND_VS=$(kubectl get virtualservice -n "$NAMESPACE" -o name 2>/dev/null | grep frontend | head -1)
     if [ -n "$FRONTEND_VS" ]; then
-        echo "Checking $FRONTEND_VS for weight configuration:"
-        kubectl get "$FRONTEND_VS" -n "$NAMESPACE" -o jsonpath='{.spec.http[0].route[*].weight}' 2>/dev/null | \
-            awk '{print "  Weights: " $0}'
-        echo
+        WEIGHTS=$(kubectl get "$FRONTEND_VS" -n "$NAMESPACE" -o jsonpath='{.spec.http[0].route[*].weight}' 2>/dev/null)
+        if [ -n "$WEIGHTS" ]; then
+            echo "  Configured weights: $WEIGHTS"
+            echo "  [OK] Traffic split configured"
+        else
+            echo "  [WARN] No weights found in VirtualService"
+            ((WARNINGS++))
+        fi
     fi
 fi
 
 # Check rate limiting
-echo "=== Rate Limiting ==="
-ENVOYFILTERS=$(kubectl get envoyfilter -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
+echo
+echo "Rate Limiting:"
+ENVOYFILTERS=$(kubectl get envoyfilter -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
 if [ "$ENVOYFILTERS" -gt 0 ]; then
-    echo "✅ EnvoyFilter found (rate limiting configured)"
-    kubectl get envoyfilter -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,AGE:.metadata.creationTimestamp
+    echo "[OK] EnvoyFilter configured ($ENVOYFILTERS filter(s))"
+    kubectl get envoyfilter -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,AGE:.metadata.creationTimestamp 2>/dev/null | head -5
 else
-    echo "⚠️  No EnvoyFilter found (rate limiting not configured)"
+    echo "[WARN] No EnvoyFilter found"
+    ((WARNINGS++))
 fi
 
 # Check pod sidecars
 echo
-echo "=== Istio Sidecar Injection ==="
-TOTAL_PODS=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)
-PODS_WITH_SIDECAR=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].name}' 2>/dev/null | grep -o istio-proxy | wc -l)
+echo "Istio Sidecar Injection:"
+TOTAL_PODS=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+PODS_WITH_SIDECAR=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].name}' 2>/dev/null | grep -o istio-proxy | wc -l | tr -d ' ')
 
 echo "  Total pods: $TOTAL_PODS"
-echo "  Pods with istio-proxy: $PODS_WITH_SIDECAR"
+echo "  Pods with sidecar: $PODS_WITH_SIDECAR"
 
 if [ "$TOTAL_PODS" -eq "$PODS_WITH_SIDECAR" ] && [ "$TOTAL_PODS" -gt 0 ]; then
-    echo "✅ All pods have Istio sidecar"
+    echo "[OK] All pods have sidecar"
 elif [ "$PODS_WITH_SIDECAR" -gt 0 ]; then
-    echo "⚠️  Some pods missing Istio sidecar"
+    echo "[WARN] Some pods missing sidecar"
+    ((WARNINGS++))
 else
-    echo "⚠️  No pods have Istio sidecar"
+    echo "[WARN] No sidecars detected"
+    ((WARNINGS++))
 fi
 
 # Summary
 echo
-echo "=== Summary ==="
-ISSUES=0
+echo "-----------------------------------"
+echo "Summary:"
+echo "  Errors: $ERRORS"
+echo "  Warnings: $WARNINGS"
 
-[ "$INJECTION" != "enabled" ] && ((ISSUES++))
-[ "$DEPLOYMENTS" -eq 0 ] && ((ISSUES++))
-[ "$V2_PODS" -eq 0 ] && ((ISSUES++))
-[ "$GATEWAYS" -eq 0 ] && ((ISSUES++))
-[ "$VS" -eq 0 ] && ((ISSUES++))
-[ "$DR" -eq 0 ] && ((ISSUES++))
-
-if [ "$ISSUES" -eq 0 ]; then
-    echo "✅ Canary deployment setup looks good!"
+if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
+    echo "  Status: All checks passed"
+    exit 0
+elif [ "$ERRORS" -eq 0 ]; then
+    echo "  Status: Passed with warnings"
     exit 0
 else
-    echo "⚠️  Found $ISSUES potential issue(s) - review output above"
+    echo "  Status: Failed"
     exit 1
 fi
