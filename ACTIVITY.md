@@ -302,3 +302,9 @@ Automated the environment bring-up so assessors only need `make`:
 - Ensured the new automation reduces manual command duplication in the docs (next step is swapping references to the new targets).
 
 PR: https://github.com/doda25-team23/operation/pull/16
+
+### Cristian
+
+Improved deployment tooling and documentation based on W6 local testing and validation experience. Created production-ready Helm values configuration with optimized resource limits, health checks, and conservative canary settings (95/5 split). Added comprehensive troubleshooting guide covering common Istio traffic management issues, rate limiting problems, pod startup failures, and monitoring configuration issues encountered during testing. Enhanced Docker Compose setup with proper dependency ordering using health check conditions and tuned health check parameters. Created validation script for quick canary deployment verification that checks namespace configuration, Istio injection, version labels, traffic management resources, and sidecar injection status.
+
+Operation commits: eb67ec0, dcd8052, 70cfdbf, c5065c2
