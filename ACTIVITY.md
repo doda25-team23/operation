@@ -308,3 +308,13 @@ PR: https://github.com/doda25-team23/operation/pull/16
 Improved deployment tooling and documentation based on W6 local testing and validation experience. Created production-ready Helm values configuration with optimized resource limits, health checks, and conservative canary settings (95/5 split). Added comprehensive troubleshooting guide covering common Istio traffic management issues, rate limiting problems, pod startup failures, and monitoring configuration issues encountered during testing. Enhanced Docker Compose setup with proper dependency ordering using health check conditions and tuned health check parameters. Created validation script for quick canary deployment verification that checks namespace configuration, Istio injection, version labels, traffic management resources, and sidecar injection status.
 
 Operation commits: eb67ec0, dcd8052, 70cfdbf, c5065c2
+
+---
+
+## Week 8
+
+### Cristian
+
+Refactored deployment validation tooling and improved documentation discoverability. Cleaned up the validation script by removing visual noise, consolidating output formatting, and implementing proper error and warning tracking with exit codes. Added comprehensive quick start guide covering Docker Compose, Kubernetes, production deployments, validation steps, and full Vagrant cluster setup to reduce onboarding friction. Reorganized main README with better documentation structure, added references to all guides, and simplified deployment instructions using Makefile targets. Extended Makefile with validate-canary target for automated deployment verification.
+
+Operation commits: 688ef78, 615c763, 8adc0e4
