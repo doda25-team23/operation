@@ -7,14 +7,44 @@ It also explains how **sticky sessions** ensure users consistently hit the same 
 
 1. **Weighted canary routing (default)**  
    Split traffic between v1 and v2 using weights (e.g., 90/10).
+These weights are configured in the **frontend** `VirtualService`.  In our Helm chart
+you can set `canary.weight` and `stable.weight` values, and the rendered
+`VirtualService` will set the `weight` fields accordingly.  For example, a 90/10 split is represented as:
 
-2. **Header override routing (for testing)**  
-   Force requests to a specific version by setting the `x-version` header to `v1` or `v2`.
+```yaml
+http:
+    - name: stable
+      route:
+        - destination:
+            host: frontend
+            subset: v1
+          weight: 90
+        - destination:
+            host: frontend
+            subset: v2
+          weight: 10
+```
+
+Make sure the weights sum to **100**; otherwise Istio normalizes them.
 
 3. **Sticky sessions (version consistency per user)**  
    Enforced via `DestinationRule` `consistentHash`, with two modes:
-    - **Cookie-based** (default in our values)
-    - **Header-based** (optional)
+   - **Cookie-based** (default in our values)
+   - **Header-based** (optional)
+
+The sticky‑session policy is configured in the `DestinationRule`’s `trafficPolicy.consistentHash`.  By default
+it uses a cookie named `sms-app-version`; you can switch to header-based stickiness by setting
+`stickySession.strategy` to `header` and specifying `stickySession.headerName`, e.g. `x-user-id`.
+
+```yaml
+trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        cookie:
+          name: sms-app-version
+          ttl: 0s
+```
+
 
 ---
 
