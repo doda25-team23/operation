@@ -308,3 +308,13 @@ PR: https://github.com/doda25-team23/operation/pull/16
 Improved deployment tooling and documentation based on W6 local testing and validation experience. Created production-ready Helm values configuration with optimized resource limits, health checks, and conservative canary settings (95/5 split). Added comprehensive troubleshooting guide covering common Istio traffic management issues, rate limiting problems, pod startup failures, and monitoring configuration issues encountered during testing. Enhanced Docker Compose setup with proper dependency ordering using health check conditions and tuned health check parameters. Created validation script for quick canary deployment verification that checks namespace configuration, Istio injection, version labels, traffic management resources, and sidecar injection status.
 
 Operation commits: eb67ec0, dcd8052, 70cfdbf, c5065c2
+
+## Week 8
+
+This week focused on stabilising and extending the monitoring and alerting setup, while debugging persistent networking and cluster connectivity issues in the local Kubernetes (Vagrant + VirtualBox) environment...
+
+- Added a resource usage alert (HighCPUUsage) to detect sustained high CPU consumption at namespace level. (https://github.com/doda25-team23/operation/pull/19)
+- Gated alert creation behind Helm values (monitoring.enabled, monitoring.alerts.enabled) (https://github.com/doda25-team23/operation/pull/19)
+- Debugged Kubernetes control-plane connectivity issues in a multi-NIC VirtualBox setup (big failure)
+- Documented findings to continue cluster networking debugging efficiently in the next iteration.
+- Improved traffic management documentation by explicitly explaining what we support (https://github.com/doda25-team23/operation/pull/18)
