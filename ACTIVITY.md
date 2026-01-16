@@ -311,6 +311,8 @@ Operation commits: eb67ec0, dcd8052, 70cfdbf, c5065c2
 
 ## Week 8
 
+### Radu
+
 This week focused on stabilising and extending the monitoring and alerting setup, while debugging persistent networking and cluster connectivity issues in the local Kubernetes (Vagrant + VirtualBox) environment...
 
 - Added a resource usage alert (HighCPUUsage) to detect sustained high CPU consumption at namespace level. (https://github.com/doda25-team23/operation/pull/19)
