@@ -30,10 +30,11 @@ grafana:
 # Common labels used for ServiceMonitor matching
 monitoring:
   enabled: true
+  alerts:
+    enabled: true
   scrapeInterval: 15s
   labels:
     release: app-stack
-
 # Alerting configuration
 alerting:
   enabled: true
