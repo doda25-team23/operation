@@ -320,3 +320,11 @@ This week focused on stabilising and extending the monitoring and alerting setup
 - Debugged Kubernetes control-plane connectivity issues in a multi-NIC VirtualBox setup (big failure)
 - Documented findings to continue cluster networking debugging efficiently in the next iteration.
 - Improved traffic management documentation by explicitly explaining what we support (https://github.com/doda25-team23/operation/pull/18)
+
+### Cristian
+
+Refactored deployment validation tooling and improved documentation discoverability. Cleaned up the validation script by removing visual noise, consolidating output formatting, and implementing proper error and warning tracking with exit codes. Added comprehensive quick start guide covering Docker Compose, Kubernetes, production deployments, validation steps, and full Vagrant cluster setup to reduce onboarding friction. Reorganized main README with better documentation structure, added references to all guides, and simplified deployment instructions using Makefile targets. Extended Makefile with validate-canary target for automated deployment verification.
+
+Operation commits: 688ef78, 615c763, 8adc0e4
+PR: https://github.com/doda25-team23/operation/pull/17
+
