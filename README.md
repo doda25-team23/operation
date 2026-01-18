@@ -21,6 +21,7 @@ The system classifies SMS messages as spam or legitimate (ham) using machine lea
 - [QUICKSTART.md](QUICKSTART.md) - Get started quickly with different deployment options
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and solutions
 - [docs/deployment.md](docs/deployment.md) - Architecture and deployment details
+- [docs/extension.md](docs/extension.md) - Release-engineering extension proposal
 - [docs/traffic-management.md](docs/traffic-management.md) - Istio canary configuration
 - [docs/continuous-experimentation.md](docs/continuous-experimentation.md) - A/B testing guide
 
@@ -41,14 +42,14 @@ Access:
 ### Kubernetes with Helm
 
 ```bash
-# Install application
-make k8s-app-install
+# Install application + monitoring
+make k8s-install
 
 # Validate deployment
 make validate-canary
 
-# Install monitoring
-make k8s-mon-install
+# Lint charts (optional)
+make k8s-lint
 ```
 
 ## Container Images

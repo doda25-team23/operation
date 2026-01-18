@@ -41,14 +41,11 @@ The compose setup includes:
 ### Option 1: Using Makefile (Recommended)
 
 ```bash
-# Install application
-make k8s-app-install
+# Install application + monitoring
+make k8s-install
 
 # Check status
-make k8s-app-status
-
-# Install monitoring stack
-make k8s-mon-install
+make k8s-status
 
 # Clean up
 make k8s-clean
@@ -99,13 +96,13 @@ After deployment, validate the setup:
 
 ```bash
 # Run validation script
-./validate-canary-setup.sh sms-app
+make validate-canary
 
 # Check Istio configuration
 kubectl get gateway,virtualservice,destinationrule -n sms-app
 
 # Test rate limiting
-./test-rate-limit.sh
+make rate-limit-test
 ```
 
 ## Accessing the Application
@@ -122,6 +119,8 @@ Add to /etc/hosts:
 ```
 192.168.56.90 app.sms-detector.local canary.sms-detector.local
 ```
+
+If you access the app through the Istio IngressGateway instead of NGINX, point the hostnames to the Istio gateway IP.
 
 ## Testing Canary Deployment
 

@@ -119,6 +119,16 @@ k8s-mon-lint: ## Run helm lint/template for monitoring chart
 # -----------------------------------------------------------------------------
 # Kubernetes helpers
 # -----------------------------------------------------------------------------
+.PHONY: k8s-install
+k8s-install: ## Install both Helm releases (app + monitoring)
+	$(MAKE) k8s-app-install
+	$(MAKE) k8s-mon-install
+
+.PHONY: k8s-lint
+k8s-lint: ## Run helm lint/template for both charts
+	$(MAKE) k8s-app-lint
+	$(MAKE) k8s-mon-lint
+
 .PHONY: k8s-status
 k8s-status: ## Show pods across all namespaces
 	$(KUBECTL) get pods -A
