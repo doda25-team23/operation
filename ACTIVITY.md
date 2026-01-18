@@ -333,3 +333,4 @@ PR: https://github.com/doda25-team23/operation/pull/17
 
 In preparation for the final submission, I polished documentation and tooling for a smoother hand-in and review. Updated `docs/deployment.md` and `docs/extension.md` to reflect the final architecture and extension proposal, resolved Mermaid rendering issues, and ensured the docs read as conceptual system descriptions for new team members. Added small automation improvements by introducing aggregated Makefile targets (`k8s-install`, `k8s-lint`), and updated `README.md` + `QUICKSTART.md` to use the new targets and clarify host/IP usage for Istio vs Ingress access.
 
+PR: https://github.com/doda25-team23/operation/pull/20
