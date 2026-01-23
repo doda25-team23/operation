@@ -309,6 +309,32 @@ Improved deployment tooling and documentation based on W6 local testing and vali
 
 Operation commits: eb67ec0, dcd8052, 70cfdbf, c5065c2
 
+### Ocean
+
+FIXES
+
+Problem: 
+    Model-service failed to start - missing model file and healthcheck using unavailable curl command.
+Solution: 
+    Added MODEL_VERSION and MODEL_BASE_URL environment variables to enable model download from GitHub Releases. Replaced curl healthcheck with Python urllib.
+
+Problem:
+    Prometheus wasn't scraping app metrics because ServiceMonitors had wrong label selectors (app.kubernetes.io/component instead of app) and wrong release label(app-stack instead of prometheus).
+Solution:
+    Updated ServiceMonitor selectors to match actual service labels (app: frontend, app: model-service) and changed release label to prometheus.
+
+Problem: 
+    READMEs lacked Kubernetes monitoring validation steps - no instructions for verifying ServiceMonitors, Prometheus scraping, AlertManager alerts, or Grafana dashboard provisioning.
+Solution:
+    Added "Verify ServiceMonitors", "Verify Prometheus Scraping", "Verify AlertManager", and "Provision Grafana Dashboards" sections to QUICKSTART.md with concrete commands and expected outputs.
+
+Problem:
+    Model-service lacked /health endpoint but Helm charts configured health probes to use it. Dockerfile passed CLI arguments that the Python script didn't accept. Frontend probes used inconsistent paths between default and production configs.
+Solution:
+     Added /health endpoint to Flask app, removed unused CLI arguments from Dockerfile CMD, and standardized health probe paths across all Helm values files (/actuator/health for frontend, /health for model-service).
+
+---
+
 ## Week 8
 
 ### Radu
@@ -328,9 +354,10 @@ Refactored deployment validation tooling and improved documentation discoverabil
 Operation commits: 688ef78, 615c763, 8adc0e4
 PR: https://github.com/doda25-team23/operation/pull/17
 
-
 ### Brewen
 
 In preparation for the final submission, I polished documentation and tooling for a smoother hand-in and review. Updated `docs/deployment.md` and `docs/extension.md` to reflect the final architecture and extension proposal, resolved Mermaid rendering issues, and ensured the docs read as conceptual system descriptions for new team members. Added small automation improvements by introducing aggregated Makefile targets (`k8s-install`, `k8s-lint`), and updated `README.md` + `QUICKSTART.md` to use the new targets and clarify host/IP usage for Istio vs Ingress access.
 
 PR: https://github.com/doda25-team23/operation/pull/20
+
+### Ocean

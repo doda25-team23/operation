@@ -34,7 +34,7 @@ monitoring:
     enabled: true
   scrapeInterval: 15s
   labels:
-    release: app-stack
+    release: prometheus
 # Alerting configuration
 alerting:
   enabled: true

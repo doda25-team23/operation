@@ -36,6 +36,23 @@ The compose setup includes:
 - Health checks enabled
 - Automatic restart on failure
 
+### Verify Metrics (Optional)
+
+After starting the services, you can verify that custom application metrics are being exposed:
+
+```bash
+# Frontend metrics
+curl http://localhost:8080/actuator/prometheus | grep app_
+
+# Model service metrics
+curl http://localhost:8081/metrics | grep app_
+```
+
+Expected custom metrics:
+- `app_predictions_total` - Counter of prediction requests (by source and status)
+- `app_prediction_latency_seconds` - Histogram of prediction duration
+- `app_active_users` - Gauge of active concurrent users
+
 ## Kubernetes Deployment
 
 ### Option 1: Using Makefile (Recommended)
@@ -141,16 +158,106 @@ curl -b cookies.txt http://app.sms-detector.local
 
 ## Monitoring
 
-Access Grafana:
-```bash
-# Port forward to Grafana
-kubectl port-forward -n monitoring svc/grafana 3000:80
+### Deploy Monitoring Stack
 
-# Open in browser
-open http://localhost:3000
+```bash
+# Install app-stack (ServiceMonitors, AlertManager config)
+helm install app-stack ./helm/app-stack -n sms-app
 ```
 
-Default credentials are typically admin/admin (check monitoring chart values).
+### Access Dashboards
+
+```bash
+# Port forward Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Port forward Prometheus
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090
+
+# Open in browser
+open http://localhost:3000   # Grafana
+open http://localhost:9090   # Prometheus
+```
+
+Default Grafana credentials: `admin` / (retrieve with):
+```bash
+kubectl get secret prometheus-grafana -n monitoring -o jsonpath="{.data.admin-password}" | base64 --decode
+```
+
+### Provision Grafana Dashboards
+
+Pre-built dashboards are available in `grafana-dashboards/` and can be automatically provisioned via ConfigMap:
+
+```bash
+# Apply dashboard ConfigMap (dashboards auto-load into Grafana)
+kubectl apply -f kubernetes/grafana-dashboard-configmap.yaml
+
+# Verify dashboard was loaded
+kubectl get configmap grafana-dashboards -n monitoring
+```
+
+Available dashboards:
+- **application-metrics.json** - Custom app metrics (predictions, latency, active users)
+- **ab-testing.json** - A/B testing and canary deployment metrics
+
+Dashboards are automatically discovered by Grafana via the `grafana_dashboard: "1"` label.
+
+### Verify ServiceMonitors
+
+Confirm ServiceMonitors are created and targeting the correct services:
+
+```bash
+# List ServiceMonitors
+kubectl get servicemonitor -n sms-app
+
+# Expected output:
+# NAME                      AGE
+# app-stack-frontend        1m
+# app-stack-model-service   1m
+
+# Check selector labels match services
+kubectl get servicemonitor -n sms-app -o yaml | grep -A3 "matchLabels"
+```
+
+### Verify Prometheus Scraping
+
+Confirm Prometheus is discovering and scraping targets:
+
+```bash
+# Port forward Prometheus (if not already)
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:9090 &
+
+# Check targets are being scraped
+curl -s "http://localhost:9090/api/v1/targets" | grep -o '"job":"sms-app[^"]*"' | sort -u
+
+# Expected output:
+# "job":"sms-app-frontend"
+# "job":"sms-app-model-service"
+
+# Query custom metrics
+curl -s "http://localhost:9090/api/v1/query?query=app_active_users"
+curl -s "http://localhost:9090/api/v1/query?query=app_predictions_total"
+```
+
+### Verify AlertManager
+
+Test that alerts are configured and can be sent:
+
+```bash
+# Port forward AlertManager
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-alertmanager 9093:9093 &
+
+# Check AlertManager status
+curl -s http://localhost:9093/api/v2/status | head -20
+
+# View configured alerts
+kubectl get prometheusrule -n sms-app
+
+# Check firing alerts
+curl -s http://localhost:9093/api/v2/alerts
+```
+
+To test webhook alerts, update `helm/app-stack/values.yaml` with a URL from [webhook.site](https://webhook.site), then trigger an alert by generating traffic.
 
 ## Troubleshooting
 
