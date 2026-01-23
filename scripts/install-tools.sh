@@ -138,7 +138,7 @@ install_tool() {
   local spec="${PKG_MAP[$tool]:-}"
 
   if [[ -z "$spec" ]]; then
-    echo "[setup] ⚠ No installer mapping for ${tool} on ${PKG_MANAGER}. Please install manually."
+    echo "[setup] [WARN] No installer mapping for ${tool} on ${PKG_MANAGER}. Install manually."
     return
   fi
 
@@ -151,7 +151,7 @@ install_tool() {
 
 for cmd in "${REQUIRED_CMDS[@]}"; do
   if command -v "$cmd" >/dev/null 2>&1; then
-    echo "[setup] ✔ ${cmd} already installed ($(command -v "$cmd"))"
+    echo "[setup] [OK] ${cmd} already installed ($(command -v "$cmd"))"
     continue
   fi
   install_tool "$cmd"
@@ -163,13 +163,13 @@ if ! docker compose version >/dev/null 2>&1; then
     dnf) dnf_install docker-compose-plugin ;;
     brew)
       cat <<'EOF'
-[setup] ⚠ docker compose plugin not detected. If you're on macOS, launch Docker Desktop
-        once so it can finish installing the CLI plugin (or install it manually).
+[setup] [WARN] docker compose plugin not detected. If on macOS, launch Docker Desktop
+        once so it can finish installing the CLI plugin (or install manually).
 EOF
       ;;
   esac
 else
-  echo "[setup] ✔ docker compose plugin detected"
+  echo "[setup] [OK] docker compose plugin detected"
 fi
 
 if [[ "$PKG_MANAGER" == "dnf" ]]; then
@@ -181,10 +181,10 @@ fi
 
 if [[ "$PKG_MANAGER" != "brew" ]] && getent group "${DOCKER_GROUP}" >/dev/null 2>&1; then
   if id -nG "${USER}" | tr ' ' '\n' | grep -qx "${DOCKER_GROUP}"; then
-    echo "[setup] ✔ user ${USER} is in the ${DOCKER_GROUP} group"
+    echo "[setup] [OK] user ${USER} is in the ${DOCKER_GROUP} group"
   else
     cat <<EOF
-[setup] ⚠ ${USER} is not part of the '${DOCKER_GROUP}' group.
+[setup] [WARN] ${USER} is not part of the '${DOCKER_GROUP}' group.
        Run: sudo usermod -aG ${DOCKER_GROUP} ${USER} && newgrp ${DOCKER_GROUP}
 EOF
   fi

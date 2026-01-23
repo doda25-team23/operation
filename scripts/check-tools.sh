@@ -33,42 +33,43 @@ cmd_version() {
 check_command() {
   local cmd="$1"
   if command -v "$cmd" >/dev/null 2>&1; then
-    print_status "✔" "$cmd ($(cmd_version "$cmd"))"
+    print_status "[OK]" "$cmd ($(cmd_version "$cmd"))"
   else
-    print_status "✖" "$cmd is missing"
+    print_status "[MISSING]" "$cmd"
     missing=1
   fi
 }
 
-print_status "…" "Checking required toolchain"
+print_status "[INFO]" "Checking required toolchain"
 for cmd in "${REQUIRED_CMDS[@]}"; do
   check_command "$cmd"
 done
 
 if docker compose version >/dev/null 2>&1; then
-  print_status "✔" "docker compose plugin available ($(docker compose version 2>/dev/null | head -n1))"
+  print_status "[OK]" "docker compose plugin ($(docker compose version 2>/dev/null | head -n1))"
 else
-  print_status "✖" "docker compose plugin missing (install docker-compose-plugin)"
+  print_status "[MISSING]" "docker compose plugin - install docker-compose-plugin"
   missing=1
 fi
 
-print_status "…" "Checking optional tools"
+print_status "[INFO]" "Checking optional tools"
 for cmd in "${OPTIONAL_CMDS[@]}"; do
   if command -v "$cmd" >/dev/null 2>&1; then
-    print_status "•" "$cmd ($(cmd_version "$cmd"))"
+    print_status "[FOUND]" "$cmd ($(cmd_version "$cmd"))"
   fi
 done
 
 if [[ -f "${KUBECONFIG_PATH}" ]]; then
-  print_status "✔" "KUBECONFIG found at ${KUBECONFIG_PATH}"
+  print_status "[OK]" "KUBECONFIG at ${KUBECONFIG_PATH}"
 else
-  print_status "⚠" "KUBECONFIG not found at ${KUBECONFIG_PATH} (run cluster-finalize to export it)"
+  print_status "[WARN]" "KUBECONFIG not found at ${KUBECONFIG_PATH} - run cluster-finalize to export"
 fi
 
+echo
 if [[ ${missing} -eq 0 ]]; then
-  print_status "✔" "All required dependencies detected."
+  print_status "[OK]" "All required dependencies detected"
+  exit 0
 else
-  print_status "✖" "Missing dependencies detected. Run 'make setup' or install manually."
+  print_status "[ERROR]" "Missing dependencies - run 'make setup' or install manually"
   exit 1
 fi
-
