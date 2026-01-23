@@ -373,3 +373,5 @@ Continued cleaning up the scripting and tooling to prepare for final submission.
 Went through the setup scripts (check-tools.sh and install-tools.sh) and replaced all the emoji characters with plain text labels like [OK], [WARN], [ERROR] etc. Makes the output cleaner and avoids encoding issues on different terminals.
 
 Added a new experiment runner script (run-experiment.sh) that ties together the full canary experiment workflow. It first validates the deployment is healthy, then checks the current traffic split configuration, generates traffic for a configurable duration while tracking which version handles each request, and finally outputs a summary with the v1/v2 distribution and pointers to check Grafana/Prometheus for the detailed metrics. Added a corresponding make target so you can just run `make run-experiment` to kick it off.
+
+PR: https://github.com/doda25-team23/operation/pull/22
