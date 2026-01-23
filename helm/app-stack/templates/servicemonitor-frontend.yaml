@@ -1,4 +1,4 @@
-{{- if and .Values.monitoring.enabled .Values.frontend.metrics.enabled }}
+{{- if .Values.monitoring.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -11,10 +11,12 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/component: frontend
-      {{- include "app-stack.selectorLabels" . | nindent 6 }}
+      app: frontend
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.appMetrics.frontend.namespace }}
   endpoints:
     - port: http
-      path: {{ .Values.frontend.metrics.path }}
+      path: {{ .Values.appMetrics.frontend.metricsPath }}
       interval: {{ .Values.monitoring.scrapeInterval }}
 {{- end }}

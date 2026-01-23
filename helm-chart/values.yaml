@@ -83,7 +83,7 @@ frontend:
   # -- Frontend liveness probe configuration
   livenessProbe:
     enabled: true
-    path: /
+    path: /actuator/health
     port: 8080
     initialDelaySeconds: 30
     periodSeconds: 30
@@ -91,7 +91,7 @@ frontend:
   # -- Frontend readiness probe configuration
   readinessProbe:
     enabled: true
-    path: /
+    path: /actuator/health
     port: 8080
     initialDelaySeconds: 15
     periodSeconds: 10
@@ -155,7 +155,7 @@ modelService:
   # -- Model service liveness probe configuration
   livenessProbe:
     enabled: true
-    path: /apidocs
+    path: /health
     port: 8081
     initialDelaySeconds: 60
     periodSeconds: 30
@@ -163,7 +163,7 @@ modelService:
   # -- Model service readiness probe configuration
   readinessProbe:
     enabled: true
-    path: /apidocs
+    path: /health
     port: 8081
     initialDelaySeconds: 30
     periodSeconds: 10
