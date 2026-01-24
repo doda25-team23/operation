@@ -1,21 +1,23 @@
 services:
   model-service:
-    image: ghcr.io/doda25-team23/model-service:latest
-    build:
-      context: ../model-service
-      dockerfile: Dockerfile
+    image: ${MODEL_SERVICE_IMAGE:-ghcr.io/doda25-team23/model-service:latest}
     container_name: sms-model-service
-    ports:
-      - "8081:8081"
+    # F6: Configurable port via environment variable
+    # Note: No ports exposed to host - only frontend should be accessible (A1 requirement)
     environment:
-      - MODEL_VERSION=model-20251121-193920
-      - MODEL_BASE_URL=https://github.com/doda25-team23/model-service/releases/download
+      - MODEL_VERSION=${MODEL_VERSION:-model-20251121-193920}
+      - MODEL_BASE_URL=${MODEL_BASE_URL:-https://github.com/doda25-team23/model-service/releases/download}
+      - MODEL_PORT=${MODEL_SERVICE_PORT:-8081}
+      - MODEL_DIR=/app/model
     volumes:
-      - ../model-service/output:/app/output
+      # Model cache volume - persists downloaded models between container restarts
+      - model-cache:/app/model
+      # Preprocessor from local output
+      - ../model-service/output/preprocessor.joblib:/app/output/preprocessor.joblib:ro
     networks:
       - sms-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/apidocs/')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${MODEL_SERVICE_PORT:-8081}/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -23,15 +25,14 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/doda25-team23/app:latest
-    build:
-      context: ../app
-      dockerfile: Dockerfile
+    image: ${FRONTEND_IMAGE:-ghcr.io/doda25-team23/app:latest}
     container_name: sms-frontend
+    # Only frontend is exposed to host (A1 requirement)
     ports:
-      - "8080:8080"
+      - "${FRONTEND_HOST_PORT:-8080}:${FRONTEND_PORT:-8080}"
     environment:
-      - MODEL_HOST=http://model-service:8081
+      - MODEL_HOST=http://model-service:${MODEL_SERVICE_PORT:-8081}
+      - APP_PORT=${FRONTEND_PORT:-8080}
       - SPRING_PROFILES_ACTIVE=docker
       - JAVA_OPTS=-Xmx512m -Xms256m
     networks:
@@ -40,7 +41,7 @@ services:
       model-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${FRONTEND_PORT:-8080}/actuator/health"]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -50,3 +51,7 @@ services:
 networks:
   sms-network:
     driver: bridge
+
+volumes:
+  # Named volume for model cache - persists across container restarts
+  model-cache:
