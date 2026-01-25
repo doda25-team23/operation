@@ -1,144 +1,109 @@
-## Extension proposal (next assignment): Reproducible releases for our canary experiment
+## Extension Proposal: "Shift-Left" Configuration Validation
 
-We are Team 23 in the DODA M.Sc. course. After completing the Kubernetes + Istio + monitoring assignments, we noticed a release-engineering shortcoming that directly threatens the validity of our canary experiment.
-
----
-
-## The pain point (release-engineering shortcoming)
-
-### What is annoying / error-prone today?
-
-Our deployment and experiment depend on distinguishing **v1 (stable)** from **v2 (canary)**. However, our current practice makes it too easy to deploy **non-reproducible** or **ambiguous** versions:
-
-- We frequently rely on **mutable image tags** (e.g., `latest`) for `frontend` and `model-service`.
-- The repository contains **multiple deployment entry points** (raw manifests + two Helm charts). This increases the chance that “what we think we deployed” diverges from “what is actually running”.
-
-### Why is this critical?
-
-For the course, our canary rollout is an *experiment*: we want to attribute outcomes (latency, errors, A/B differences) to a *specific* change between v1 and v2. If both versions accidentally reference the same image (or if `latest` changes over time), we lose:
-
-- **Reproducibility**: we cannot re-run the same experiment later.
-- **Traceability**: we cannot confidently answer “what commit was deployed?”
-- **Interpretability**: observed differences may be due to untracked changes.
-
-This is a release-engineering problem (versioning and promotion), not “just a Kubernetes configuration” issue.
+We are Team 23 in the DODA M.Sc. course. Throughout the assignment, we noticed that while our application code is linted and tested, our **infrastructure code (YAML)** is not. This leads to a slow and frustrating feedback loop during deployments.
 
 ---
 
-## Proposed refactoring/extension (1–5 days)
+## 1. The Pain Point: Slow Feedback on Configuration Errors
 
-### Goal
+### What is the problem?
+Currently, if we make a mistake in our Kubernetes configuration (e.g., forgetting a `livenessProbe`, missing a required `label`, or defining invalid resource limits), we only discover it **at deployment time**.
+1.  **Late Detection**: We have to commit, push, wait for the pipeline to run, and watch `helm upgrade` fail (or worse, the pod crashes after deployment).
+2.  **Wasted Time**: A simple typo can cost 10-15 minutes of "debugging via pipeline."
+3.  **Inconsistent Quality**: Without automated checks, it's easy to merge a PR that "works" but violates best practices (e.g., running as root, no CPU limits), creating technical debt.
 
-Make deployments (especially canary experiments) **reproducible by construction** by enforcing **immutable version selection** for both services.
+### Why is this a shortcoming?
+In modern Release Engineering, we aim to "Shift Left"—finding errors as early as possible in the development cycle. Our current process catches config errors at the very end (Deployment), which is the most expensive place to fix them.
 
-### High-level design
+---
 
-1. **Replace mutable tagging with immutable selection**
-   - For each rollout, we deploy:
-     - `frontend` v1 = **pinned image identifier**
-     - `frontend` v2 = **different pinned image identifier**
-     - same for `model-service`
-   - “Pinned identifier” can be a semver tag *or* (stronger) an **OCI digest**.
+## 2. Proposed Extension: Automated Static Analysis for Manifests
 
-2. **Add a lightweight “release manifest”** for the experiment
-   - A single file (e.g., `experiment-release.yaml`) that records:
-     - image tags/digests for v1 and v2
-     - traffic split (90/10)
-     - sticky-session strategy (cookie/header)
-     - rate limit parameters
-   - This document becomes the reference for “what experiment did we run?”
+We propose to integrate a **Static Analysis** tool (specifically **KubeLinter** or **Kubeval**) into our local workflow and CI pipeline. This treats our infrastructure configuration with the same rigor as our application source code.
 
-3. **Introduce a CI validation gate**
-   - Validate that the manifest and Helm values:
-     - do not use `latest`
-     - select distinct versions for v1 and v2
-     - keep traffic-split weights valid (sum to 100)
+### High-Level Design
+We will introduce a validation step that runs **before** any attempt to deploy.
 
-### Visualization: current vs proposed workflow
+1.  **The Validator**: A CLI tool that parses our Helm charts and rendered manifests.
+2.  **The Ruleset**: A configuration file defining what "Good" looks like:
+    *   *Reliability*: All deployments must have liveness/readiness probes.
+    *   *Efficiency*: All containers must have CPU/Memory requests and limits.
+    *   *Security*: No container should run as root (securityContext).
+3.  **The Gate**: If the linter finds violations, the commit is rejected or the build fails immediately.
+
+### Visualization: Feedback Loop
 
 ```mermaid
-flowchart TB
-  subgraph NOW["Today (risk of ambiguity)"]
-    PR1["Change merged"] --> DEP1["Deploy with Helm values"]
-    DEP1 --> L1["Images may use latest"]
-    L1 --> EXP1["Run 90/10 canary"]
-    EXP1 --> Q1["Hard to reproduce later"]
-  end
+flowchart LR
+    subgraph "Current: Slow Loop"
+        Dev1[Dev] -->|Commit| Git1[Git]
+        Git1 -->|Deploy| K8s[Cluster]
+        K8s -->|Crash/Fail| Err1[Error Found]
+        Err1 -.->|15 mins later| Dev1
+    end
 
-  subgraph NEW["After extension (reproducible)"]
-    PR2["Change merged"] --> REL["Create release manifest<br/>with pinned image ids"]
-    REL --> CI["CI validation gate"]
-    CI --> DEP2["Deploy from manifest"]
-    DEP2 --> EXP2["Run 90/10 canary"]
-    EXP2 --> Q2["Re-run experiment anytime"]
-  end
+    subgraph "Proposed: Fast Loop (Shift Left)"
+        Dev2[Dev] -->|Run Linter| Lint[Static Analysis]
+        Lint -->|Violation| Err2[Error Found]
+        Err2 -.->|10 seconds later| Dev2
+        Lint -->|Pass| Git2[Commit]
+    end
 ```
 
 ---
 
-## Concrete implementation tasks (clear 1–5 day plan)
+## 3. Concrete Implementation Tasks (1-3 Day Plan)
 
-### A) Add immutability and experiment manifest
+### Task A: Tool Selection & Setup (Day 1)
+*   Install **KubeLinter** (open source by StackRox) locally.
+*   Create a `.kube-linter.yaml` config file in the repo root.
+*   Define the initial policy: disable noisy checks, enable critical ones (Limits, Probes).
 
-- **Task A1**: Create `docs/experiment-release.template.md` (human-readable) and `experiment-release.yaml` (machine-readable) in this repo.
-- **Task A2**: Update our Helm values convention so that:
-  - v1 and v2 image identifiers are explicit
-  - v1 and v2 cannot be identical by accident
+### Task B: Integration Script (Day 1)
+*   Create `scripts/lint-manifests.sh`.
+*   This script should:
+    1.  Run `helm template` to render the charts into raw YAML (since linters often work on raw YAML).
+    2.  Pipe the output to `kube-linter check`.
+    3.  Exit with code 1 if issues are found.
 
-### B) Add CI enforcement (“release validation gate”)
-
-- **Task B1**: Add a script (`scripts/validate-release.sh`) that checks:
-  - no `:latest` tags in the experiment manifest
-  - v1 != v2 for both services
-  - traffic weights are valid (sum to 100)
-- **Task B2**: Run `helm lint` + `helm template` to ensure charts render.
-- **Task B3**: Optional but valuable: schema checks (e.g., `kubeconform`) on rendered manifests.
-- **Task B4**: Add a GitHub Actions workflow that runs these validations for every PR.
-
-### C) (Optional) Improve promotion safety
-
-- **Task C1**: Add a documented manual promotion step: update the manifest so v2 becomes the new v1, then redeploy.
-- **Task C2**: (Stretch) Add a canary “scorecard” checklist based on Prometheus metrics (error rate, latency) before promoting.
+### Task C: CI/Workflow Integration (Day 2)
+*   Add a `lint` target to our `Makefile`.
+*   (Optional) Add a pre-commit hook or GitHub Actions workflow to run this automatically on every PR.
 
 ---
 
-## Expected outcome
+## 4. Expected Outcome
 
-- **Reproducible experiments**: we can re-run the same 90/10 canary with identical versions.
-- **Reduced operator error**: CI blocks accidental `latest` usage and v1/v2 mismatches.
-- **Clearer design discussions**: we can point to the manifest as “the experiment configuration”.
-
----
-
-## How to measure whether it worked (experiment design)
-
-We can measure the impact with a before/after study across several PRs:
-
-- **Primary metric: reproducibility time**
-  - Definition: time to answer “what exact versions were deployed in the canary experiment?”
-  - Expectation: after the change, it becomes near-instant (read one manifest).
-
-- **Secondary metric: configuration-induced deployment failures**
-  - Definition: number of failed deploy attempts due to wrong tags/values/misrendered manifests.
-  - Expectation: decreases after introducing validation.
-
-- **Delivery-performance tie-in (DORA / Four Keys)**
-  - Focus: lower **change failure rate** and reduced **time to restore** when rollbacks are needed.
+*   **Instant Feedback**: Developers know immediately if their YAML is invalid.
+*   **Higher Quality**: We guarantee that *every* pod in production has resource limits and health checks.
+*   **Reduced Frustration**: No more "waiting for CI" just to find a syntax error.
 
 ---
 
-## Assumptions and downsides
+## 5. Evaluation: Measuring Improvement
 
-- **Assumption**: we can build/publish images with immutable identifiers (tag or digest) in our CI.
-- **Downside**: pinned digests are less readable than tags; we mitigate by storing both tag and digest in the manifest.
-- **Downside**: validation adds a small CI time cost, but it saves much more time than it consumes when errors occur.
+We can measure the efficiency of our development process.
+
+**Hypothesis**: Static analysis significantly reduces the "Time to Detect" configuration errors.
+
+**Experiment Protocol**:
+1.  **Scenario**: Introduce a common error: remove the `readinessProbe` from `frontend-deployment.yaml`.
+2.  **Baseline (Current)**:
+    *   Time the process: Commit -> Push -> Deploy -> Watch Pods -> "CrashLoopBackOff" or "Service Unavailable".
+    *   *Estimate*: ~5-10 minutes.
+3.  **Treatment (Proposed)**:
+    *   Time the process: Run `make lint`.
+    *   *Estimate*: < 10 seconds.
+
+**Metric**: **Feedback Latency** (Time from error introduction to error discovery).
 
 ---
 
-## Sources (quality references)
+## 6. Sources and Inspiration
 
-- **Kubernetes docs** on image tags and pull behavior (why `latest` is risky): `https://kubernetes.io/docs/concepts/containers/images/`
-- **Google Kubernetes Engine guide** on using image digests (immutability): `https://cloud.google.com/kubernetes-engine/docs/tutorials/using-container-image-digests-in-kubernetes-manifests`
-- **DORA report** (delivery performance metrics): `https://dora.dev/research/2022/dora-report/2022-dora-accelerate-state-of-devops-report.pdf`
-- **Google SRE workbook** discussion of canarying releases (monitoring and safe rollout): `https://sre.google/workbook/canarying-releases/`
-- **Helm documentation** for chart validation (`helm lint`): `https://helm.sh/docs/helm/helm_lint/`
+*   **KubeLinter Documentation**:
+    *   *Source*: The tool we plan to use.
+    *   [https://docs.kubelinter.io/](https://docs.kubelinter.io/)
+*   **Google Cloud: Shift Left Security**:
+    *   *Concept*: Explains the philosophy of moving checks earlier in the pipeline.
+    *   [https://docs.cloud.google.com/architecture/framework/security/implement-shift-left-security](https://docs.cloud.google.com/architecture/framework/security/implement-shift-left-security)
