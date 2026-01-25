@@ -375,3 +375,9 @@ Went through the setup scripts (check-tools.sh and install-tools.sh) and replace
 Added a new experiment runner script (run-experiment.sh) that ties together the full canary experiment workflow. It first validates the deployment is healthy, then checks the current traffic split configuration, generates traffic for a configurable duration while tracking which version handles each request, and finally outputs a summary with the v1/v2 distribution and pointers to check Grafana/Prometheus for the detailed metrics. Added a corresponding make target so you can just run `make run-experiment` to kick it off.
 
 PR: https://github.com/doda25-team23/operation/pull/22
+
+### Brewen
+
+Finalized the `docs/extension.md` proposal for the "Shift-Left Configuration Validation" extension. The proposal identifies the slow feedback loop on infrastructure configuration errors as a critical release engineering shortcoming. It advocates for integrating static analysis tools (like KubeLinter) to catch manifest errors locally or in CI before deployment ("Shift Left"), replacing the expensive "deploy-to-fail" cycle. The plan includes a measurable "Feedback Latency" experiment (comparing 5+ minutes debugging time vs 10s linting time) and concrete implementation steps to integrate validation into the `Makefile` and CI pipeline.
+
+PR: https://github.com/doda25-team23/operation/pull/25
