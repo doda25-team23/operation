@@ -2,7 +2,7 @@
 # Canary Experiment Runner
 # Executes a full canary experiment workflow with validation and metrics collection
 
-set -e
+set -euo pipefail
 
 NAMESPACE="${1:-sms-app}"
 DURATION="${2:-300}"  # default 5 minutes observation

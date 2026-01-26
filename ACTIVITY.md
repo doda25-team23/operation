@@ -374,3 +374,14 @@ PR: https://github.com/doda25-team23/operation/pull/22
 Finalized the `docs/extension.md` proposal for the "Shift-Left Configuration Validation" extension. The proposal identifies the slow feedback loop on infrastructure configuration errors as a critical release engineering shortcoming. It advocates for integrating static analysis tools (like KubeLinter) to catch manifest errors locally or in CI before deployment ("Shift Left"), replacing the expensive "deploy-to-fail" cycle. The plan includes a measurable "Feedback Latency" experiment (comparing 5+ minutes debugging time vs 10s linting time) and concrete implementation steps to integrate validation into the `Makefile` and CI pipeline.
 
 PR: https://github.com/doda25-team23/operation/pull/25
+
+---
+
+## Week 10
+
+### Cristian
+
+Solved conflicts to help update main.
+Made small quality improvements to the deployment tooling and configuration. Updated docker-compose.yml to use the proper health check endpoint for model-service, changed from checking apidocs to the dedicated health endpoint which is more reliable and faster. Improved the bash scripts by adding stricter error handling with set -euo pipefail instead of just set -e, which catches undefined variables and pipeline failures. Added @ prefix to Makefile targets for rate-limit-test, validate-canary, and run-experiment to suppress command echo and make the output cleaner.
+
+PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26

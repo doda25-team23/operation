@@ -2,7 +2,7 @@
 # Rate Limiting Test Script
 # Tests the Istio rate limiting feature by sending rapid requests
 
-set -e
+set -euo pipefail
 
 TARGET_URL="${1:-http://app.sms-detector.local}"
 NUM_REQUESTS="${2:-15}"
