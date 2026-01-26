@@ -2,116 +2,93 @@
 
 ## Summary
 
-We run a canary experiment for a new `app-service` version (v2) in production-like conditions. Using Istio traffic management, we route 90% of incoming requests to the stable version (v1) and 10% to the canary (v2). We compare the versions using Prometheus-scraped application metrics and a Grafana dashboard to decide whether to promote v2.
+We implement canary deployment infrastructure for `model-service` using Istio traffic management. The setup enables weighted traffic routing between versions with Prometheus metrics and Grafana dashboards for observability.
 
 ---
 
-## What changed (compared to the base design)
+## Implementation
 
-- Deployed **two versions** of `app-service` simultaneously:
-  - **v1 (stable)**
-  - **v2 (canary)**
-- Configured Istio routing so that:
-  - 90% of user traffic goes to **v1**
-  - 10% goes to **v2**
-- Both versions expose Prometheus metrics on `/actuator/prometheus` (or `/metrics`, depending on our implementation).
-- A Grafana dashboard visualizes version-separated performance and error metrics.
+### Infrastructure Components
 
-> NOTE: This experiment focuses on the `app-service` change. The `model-service` is held constant to avoid confounding effects.
+- **Istio VirtualService**: Routes traffic with configurable weights (default 90/10)
+- **Istio DestinationRule**: Defines v1/v2 subsets based on pod version labels
+- **Prometheus**: Scrapes `app_predictions_total` and `app_prediction_latency_seconds` metrics
+- **Grafana Dashboard**: Visualizes request rate, latency, and errors by pod
 
----
+### Helm Chart Configuration
 
-## Falsifiable hypothesis
+```yaml
+# values-canary-example.yaml
+istio:
+  trafficSplit:
+    stable: 90   # v1
+    canary: 10   # v2
+```
 
-- **H0 (null):** `app-service` v2 does **not** improve latency compared to v1 (or is worse).
-- **H1 (alternative):** `app-service` v2 has **lower latency** than v1 under real traffic without increasing error rate.
+### Metrics Exposed
 
-This hypothesis is falsifiable because it is evaluated via measurable request latency and error metrics.
-
----
-
-## Experiment design
-
-### Versions
-
-- `app-service`:
-  - v1: stable
-  - v2: canary
-- Routing:
-  - Incoming requests enter via the Istio IngressGateway and are routed using an Istio VirtualService.
-  - Weighted routing sends ~90% to v1 and ~10% to v2.
-
-### Observation window
-
-- We observe metrics for **30–60 minutes** under normal usage (or a controlled load test that approximates typical usage).
-
-### How to reproduce / verify routing
-
-- Send multiple requests and observe version-specific metrics changing over time.
-- Optional: if we support a header-based route for debugging (e.g., `X-Canary: true`), we use it only to validate connectivity, not for the main experiment.
+| Metric | Type | Labels |
+|--------|------|--------|
+| `app_predictions_total` | Counter | status, pod |
+| `app_prediction_latency_seconds` | Histogram | source, pod |
 
 ---
 
-## Metrics
+## Experiment Design
 
-We use two metrics categories:
+### Hypothesis
 
-1. **Latency** (primary): request latency (p95 / p99 or histogram-based)
-2. **Errors** (guardrail): 5xx error rate (or exception count)
+- **H0:** v2 does not improve latency compared to v1
+- **H1:** v2 has lower latency than v1 without increasing error rate
 
-### Primary metric: request latency
+### Decision Criteria
 
-- We compare v1 vs v2 using histogram metrics (e.g., Spring Boot’s `http_server_requests_seconds_bucket`)
-- We visualize p95 latency per version.
+**Accept v2:** p95 latency ≤ v1 (within 10% tolerance), error rate comparable
 
-### Guardrail metric: error rate
-
-- We compare v1 vs v2 by 5xx response rate (or similar), per version.
+**Reject v2:** Latency regression or error rate increase
 
 ---
 
-## Decision process
+## Running the Experiment
 
-We decide whether to **accept (promote)** or **reject (roll back)** v2 using the Grafana dashboard.
+```bash
+# 1. Start Minikube with Istio
+minikube start --cpus=4 --memory=8192
+istioctl install --set profile=demo -y
 
-### Accept criteria (promote v2)
+# 2. Install monitoring
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
 
-- v2 shows **no regression** in tail latency:
-  - **p95 latency of v2 ≤ p95 latency of v1** (or within a small tolerance)
-- v2 shows **no meaningful error increase**:
-  - error rate remains comparable to v1
+# 3. Deploy application
+kubectl create namespace sms-app
+kubectl label namespace sms-app istio-injection=enabled
+helm install sms-app ./helm-chart -n sms-app -f ./helm-chart/values-canary-example.yaml
 
-### Reject criteria (roll back to v1)
+# 4. Generate traffic
+kubectl port-forward -n sms-app svc/model-service 8081:8081 &
+while true; do curl -s -X POST -H "Content-Type: application/json" -d '{"sms":"test"}' http://localhost:8081/predict; sleep 1; done
 
-- v2 increases tail latency significantly for sustained periods
-- v2 increases error rate (5xx or exceptions) compared to v1
-
-### Action after decision
-
-- **Accept:** gradually increase v2 weight (e.g., 10% → 25% → 50% → 100%), then deprecate v1.
-- **Reject:** set routing back to 100% v1 immediately.
-
----
-
-## Grafana dashboard
-
-Our Grafana dashboard supports the decision by directly comparing v1 and v2 metrics.
-
-### Panels included (minimum)
-
-- **p95 latency (v1 vs v2)**
-- **Request rate (v1 vs v2)** (to ensure v2 actually receives traffic)
-- **5xx error rate (v1 vs v2)**
-
-### Screenshot evidence
-
-> TODO: Add Grafana screenshots after executing the experiment run.
-> Expected files:
->
-> - docs/images/ce-traffic-split.png
-> - docs/images/ce-latency-v1-v2.png
-> - docs/images/ce-error-rate-v1-v2.png
+# 5. Observe in Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+# Import grafana-dashboards/ab-testing.json
+```
 
 ---
 
-## Notes on consistency
+## Promotion/Rollback
+
+```bash
+# Promote canary
+helm upgrade sms-app ./helm-chart -n sms-app --set istio.trafficSplit.stable=50 --set istio.trafficSplit.canary=50
+
+# Rollback
+helm upgrade sms-app ./helm-chart -n sms-app --set istio.trafficSplit.stable=100 --set istio.trafficSplit.canary=0
+```
+
+---
+
+## Limitations
+
+- Current helm chart deploys single version; true side-by-side v1/v2 requires chart modification
+- Metrics grouped by pod name, not version label
+- Istio telemetry metrics not scraped; uses application-level metrics

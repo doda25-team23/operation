@@ -149,77 +149,66 @@ Added imagePullSecrets to Helm deployments for private GH container registry acc
 Added lstio injection label to the namespace template
 
 Rate limiting visualization:
-┌─────────────────────────────────────────────────────────────────┐
-│                        Kubernetes Cluster                       │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │                    Namespace: sms-app                     │ │
-│  │                (istio-injection: enabled)                 │ │
-│  │                                                           │ │
-│  │   External Request                                        │ │
-│  │         │                                                 │ │
-│  │         ▼                                                 │ │
-│  │   ┌──────────┐                                            │ │
-│  │   │ Ingress  │  (nginx)                                   │ │
-│  │   │ Gateway  │  app.sms-detector.local                    │ │
-│  │   └────┬─────┘                                            │ │
-│  │        │                                                  │ │
-│  │        ▼                                                  │ │
-│  │   ┌─────────────────────────────────────┐                │ │
-│  │   │   Pod: frontend (2/2 Running)       │                │ │
-│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
-│  │   │  │ istio-proxy  │  │   frontend   │ │                │ │
-│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
-│  │   │  │              │  │              │ │                │ │
-│  │   │  │ Rate Limit:  │  │  Port 8080   │ │                │ │
-│  │   │  │ 10 req/min   │  │              │ │                │ │
-│  │   │  │              │  │              │ │                │ │
-│  │   │  │ ✓ Allow      │  └──────┬───────┘ │                │ │
-│  │   │  │ ✗ HTTP 429   │         │         │                │ │
-│  │   │  └──────┬───────┘         │         │                │ │
-│  │   │         │                 │         │                │ │
-│  │   │         └─────────────────┘         │                │ │
-│  │   │                 │                   │                │ │
-│  │   └─────────────────┼───────────────────┘                │ │
-│  │                     │                                    │ │
-│  │                     ▼                                    │ │
-│  │             ┌───────────────┐                            │ │
-│  │             │   Service:    │                            │ │
-│  │             │ model-service │                            │ │
-│  │             │ ClusterIP     │                            │ │
-│  │             └───────┬───────┘                            │ │
-│  │                     │                                    │ │
-│  │                     ▼                                    │ │
-│  │   ┌─────────────────────────────────────┐                │ │
-│  │   │   Pod: model-service (2/2 Running)  │                │ │
-│  │   │  ┌──────────────┐  ┌──────────────┐ │                │ │
-│  │   │  │ istio-proxy  │  │ model-service│ │                │ │
-│  │   │  │   (Envoy)    │◄─┤  container   │ │                │ │
-│  │   │  │              │  │              │ │                │ │
-│  │   │  │              │  │  Port 8081   │ │                │ │
-│  │   │  └──────────────┘  └──────────────┘ │                │ │
-│  │   └─────────────────────────────────────┘                │ │
-│  │                                                          │ │
-│  │   ┌─────────────────────────────────────┐                │ │
-│  │   │        EnvoyFilter Resource         │                │ │
-│  │   │  name: sms-app-rate-limit           │                │ │
-│  │   │  workloadSelector:                  │                │ │
-│  │   │    app: frontend                    │                │ │
-│  │   │  config:                            │                │ │
-│  │   │    maxTokens: 10                    │                │ │
-│  │   │    fillInterval: 60s                │                │ │
-│  │   └─────────────────────────────────────┘                │ │
-│  │                                                           │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
 
-Traffic Flow with Rate Limiting:
+```mermaid
+flowchart TB
+    subgraph cluster["Kubernetes Cluster"]
+        subgraph ns["Namespace: sms-app (istio-injection: enabled)"]
+            req[External Request] --> ingress
 
-1. request ->ingress-> istio-proxy (sidecar)
+            subgraph ingress["Ingress Gateway (nginx)"]
+                ing_label["app.sms-detector.local"]
+            end
+
+            ingress --> frontend_pod
+
+            subgraph frontend_pod["Pod: frontend (2/2 Running)"]
+                direction LR
+                subgraph envoy1["istio-proxy (Envoy)"]
+                    rate["Rate Limit: 10 req/min"]
+                    allow["✓ Allow"]
+                    block["✗ HTTP 429"]
+                end
+                subgraph fe_container["frontend container"]
+                    fe_port["Port 8080"]
+                end
+                envoy1 <--> fe_container
+            end
+
+            frontend_pod --> model_svc
+
+            subgraph model_svc["Service: model-service (ClusterIP)"]
+            end
+
+            model_svc --> model_pod
+
+            subgraph model_pod["Pod: model-service (2/2 Running)"]
+                direction LR
+                subgraph envoy2["istio-proxy (Envoy)"]
+                end
+                subgraph ms_container["model-service container"]
+                    ms_port["Port 8081"]
+                end
+                envoy2 <--> ms_container
+            end
+
+            subgraph envoyfilter["EnvoyFilter Resource"]
+                ef_name["name: sms-app-rate-limit"]
+                ef_selector["workloadSelector: app: frontend"]
+                ef_config["config: maxTokens: 10, fillInterval: 60s"]
+            end
+
+            envoyfilter -.-> envoy1
+        end
+    end
+```
+
+**Traffic Flow with Rate Limiting:**
+
+1. Request → Ingress → istio-proxy (sidecar)
 2. istio-proxy checks token bucket (10 tokens available)
-3. If tokens available: allow-> forward to frontend container
-4. If no tokens: block ->return HTTP 429 (rate limited)
+3. If tokens available: Allow → forward to frontend container
+4. If no tokens: Block → return HTTP 429 (rate limited)
 5. Tokens refill at 10 tokens per 60 seconds
 
 PR: https://github.com/doda25-team23/operation/pull/9
@@ -261,17 +250,16 @@ DEPLOYMENT ORDER:
 1. helm install sms-app ./helm-chart -n sms-app --create-namespace
 2. helm install app-stack ./helm/app-stack -n monitoring --create-namespace
 
-CHART SEPARATION:
-┌─────────────────────────┬──────────────────────────────────────┐
-│ helm-chart/             │ helm/app-stack/                      │
-├─────────────────────────┼──────────────────────────────────────┤
-│ Application Deployment  │ Monitoring & Alerting                │
-│ • Frontend              │ • Prometheus                         │
-│ • Model Service         │ • ServiceMonitors (cross-namespace)  │
-│ • Istio (Gateway, VS)   │ • PrometheusRule                     │
-│ • Rate Limiting         │ • AlertManager                       │
-│ • Ingress               │ • AlertManagerConfig                 │
-└─────────────────────────┴──────────────────────────────────────┘
+**Chart Separation:**
+
+| helm-chart/ | helm/app-stack/ |
+|-------------|-----------------|
+| **Application Deployment** | **Monitoring & Alerting** |
+| Frontend | Prometheus |
+| Model Service | ServiceMonitors (cross-namespace) |
+| Istio (Gateway, VS) | PrometheusRule |
+| Rate Limiting | AlertManager |
+| Ingress | AlertManagerConfig |
 
 PR: https://github.com/doda25-team23/operation/pull/14
 
@@ -333,6 +321,11 @@ Problem:
 Solution:
      Added /health endpoint to Flask app, removed unused CLI arguments from Dockerfile CMD, and standardized health probe paths across all Helm values files (/actuator/health for frontend, /health for model-service).
 
+PR: 
+https://github.com/doda25-team23/operation/pull/21
+https://github.com/doda25-team23/model-service/pull/5
+https://github.com/doda25-team23/app/pull/2
+
 ---
 
 ## Week 8
@@ -375,6 +368,12 @@ Went through the setup scripts (check-tools.sh and install-tools.sh) and replace
 Added a new experiment runner script (run-experiment.sh) that ties together the full canary experiment workflow. It first validates the deployment is healthy, then checks the current traffic split configuration, generates traffic for a configurable duration while tracking which version handles each request, and finally outputs a summary with the v1/v2 distribution and pointers to check Grafana/Prometheus for the detailed metrics. Added a corresponding make target so you can just run `make run-experiment` to kick it off.
 
 PR: https://github.com/doda25-team23/operation/pull/22
+
+### Brewen
+
+Finalized the `docs/extension.md` proposal for the "Shift-Left Configuration Validation" extension. The proposal identifies the slow feedback loop on infrastructure configuration errors as a critical release engineering shortcoming. It advocates for integrating static analysis tools (like KubeLinter) to catch manifest errors locally or in CI before deployment ("Shift Left"), replacing the expensive "deploy-to-fail" cycle. The plan includes a measurable "Feedback Latency" experiment (comparing 5+ minutes debugging time vs 10s linting time) and concrete implementation steps to integrate validation into the `Makefile` and CI pipeline.
+
+PR: https://github.com/doda25-team23/operation/pull/25
 
 ---
 
