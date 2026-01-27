@@ -355,6 +355,29 @@ PR: https://github.com/doda25-team23/operation/pull/20
 
 ### Ocean
 
+app:
+Added lib-version dependency from GitHub Packages (F1)
+Integrated VersionUtil in FrontendController.java to display library version on the web UI
+
+model-service:
+Removed hard-coded model from Dockerfile; model now downloads at runtime (F10)
+Added MODEL_PORT environment variable for flexible port configuration (F6)
+
+lib-version:
+Fixed staging.yml workflow bug: $STAGING_VERSION variable was missing the $ prefix (F11)
+
+operation:
+Updated docker-compose.yml: removed model-service port exposure (only frontend on localhost), added environment variable configuration
+Created .env and .env.example for container image and model configuration
+Updated documentation (README, QUICKSTART, TROUBLESHOOTING) with ghcr.io authentication instructions for private images
+
+PR: https://github.com/doda25-team23/operation/pull/27
+Commits 
+APP: c8af1e8407813b41cdab89697a3fdbc5bdf9de3e
+Model Service: cc720660df1a5a40dec2fc9541a9ad9132e66958
+Lib: b5f494d90f73e4e56cc0eea1d8b0d27e815024aa
+
+
 ---
 
 ## Week 9
