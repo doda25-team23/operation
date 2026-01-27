@@ -408,3 +408,13 @@ Solved conflicts to help update main.
 Made small quality improvements to the deployment tooling and configuration. Updated docker-compose.yml to use the proper health check endpoint for model-service, changed from checking apidocs to the dedicated health endpoint which is more reliable and faster. Improved the bash scripts by adding stricter error handling with set -euo pipefail instead of just set -e, which catches undefined variables and pipeline failures. Added @ prefix to Makefile targets for rate-limit-test, validate-canary, and run-experiment to suppress command echo and make the output cleaner.
 
 PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26
+
+### Radu
+
+Improved container robustness and repository hygiene. Added a Docker-level HEALTHCHECK to the frontend image that probes the existing Spring Boot Actuator /actuator/health endpoint, enabling Docker/Kubernetes to automatically detect and restart unhealthy containers. Additionally, removed IntelliJ IDEA–specific files (.idea/) from version control and updated .gitignore to prevent IDE-local metadata from being committed, ensuring the repository remains cleans without any unnecessary metadata unrelated to the project.
+
+PRs: 
+- https://github.com/doda25-team23/operation/pull/28
+- https://github.com/doda25-team23/app/pull/3 
+- https://github.com/doda25-team23/model-service/pull/6
+
