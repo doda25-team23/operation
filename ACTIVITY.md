@@ -404,10 +404,11 @@ PR: https://github.com/doda25-team23/operation/pull/25
 
 ### Cristian
 
-Solved conflicts to help update main.
-Made small quality improvements to the deployment tooling and configuration. Updated docker-compose.yml to use the proper health check endpoint for model-service, changed from checking apidocs to the dedicated health endpoint which is more reliable and faster. Improved the bash scripts by adding stricter error handling with set -euo pipefail instead of just set -e, which catches undefined variables and pipeline failures. Added @ prefix to Makefile targets for rate-limit-test, validate-canary, and run-experiment to suppress command echo and make the output cleaner.
+Prepared presentation materials and fixed critical deployment issues. Made small quality improvements to the deployment tooling and configuration. Updated docker-compose.yml to use the proper health check endpoint for model-service, changed from checking apidocs to the dedicated health endpoint which is more reliable and faster. Improved the bash scripts by adding stricter error handling with set -euo pipefail instead of just set -e, which catches undefined variables and pipeline failures. Added @ prefix to Makefile targets for rate-limit-test, validate-canary, and run-experiment to suppress command echo and make the output cleaner.
 
-PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26
+Diagnosed and fixed production deployment issue where model-service was returning 500 errors on all prediction requests. Through pod log inspection and direct endpoint testing, identified that preprocessor.joblib was missing from containers despite being available in GitHub releases. Root cause was that download_model.py only downloaded model.joblib and ignored the preprocessor. Fixed by updating download_model.py to download both files and modified text_preprocessing.py to check MODEL_DIR environment variable with fallback to output/ for local development. Temporarily copied preprocessor to running pods for immediate fix, then implemented permanent solution in model-service repository. Set up continuous traffic generation script for monitoring validation and verified full request path through Istio ingress gateway.
+
+PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26, https://github.com/doda25-team23/model-service/pull/7, https://github.com/doda25-team23/operation/pull/29
 
 ### Radu
 
