@@ -6,8 +6,9 @@ kubeconfig
 *.kubeconfig
 admin.conf
 
-# IDE
+# IntelliJ IDEA and VSCode
 .idea/
+*.iml
 .vscode/
 
 # Private SSH keys (public keys .pub are OK)
