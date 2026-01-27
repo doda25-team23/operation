@@ -94,8 +94,46 @@ kubectl describe pod -n sms-app <pod-name>
 
 ## Image Pull Issues
 
-### ImagePullBackOff error
-**Symptom:** Cannot pull images from ghcr.io.
+### Docker Compose: Unauthorized error
+**Symptom:** `docker-compose up` fails with "unauthorized" or "pull access denied".
+
+**Solution:**
+1. Login to GitHub Container Registry:
+   ```bash
+   docker login ghcr.io -u YOUR_GITHUB_USERNAME
+   # Enter your GitHub PAT (with read:packages scope) as password
+   ```
+
+2. If using sudo with docker-compose, login with sudo too:
+   ```bash
+   sudo docker login ghcr.io -u YOUR_GITHUB_USERNAME
+   ```
+
+3. Verify login works:
+   ```bash
+   docker pull ghcr.io/doda25-team23/app:latest
+   ```
+
+4. If credentials still fail, check `~/.docker/config.json`:
+   ```bash
+   cat ~/.docker/config.json
+   ```
+   Should contain an auth entry for `ghcr.io`. If it shows `credsStore: desktop` on WSL/Linux without Docker Desktop, remove that line.
+
+### Docker credential helper errors
+**Symptom:** `docker-credential-desktop.exe: executable file not found`
+
+**Solution (WSL/Linux without Docker Desktop):**
+```bash
+# Remove the credsStore entry from docker config
+echo '{}' > ~/.docker/config.json
+
+# Re-login
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+```
+
+### Kubernetes: ImagePullBackOff error
+**Symptom:** Cannot pull images from ghcr.io in Kubernetes.
 
 **Solution:**
 1. Verify secret exists:
