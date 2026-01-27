@@ -373,7 +373,7 @@ Updated documentation (README, QUICKSTART, TROUBLESHOOTING) with ghcr.io authent
 
 PR: https://github.com/doda25-team23/operation/pull/27
 Commits 
-APP: c8af1e8407813b41cdab89697a3fdbc5bdf9de3e
+APP: c8af1e8407813b41cdab89697a3fdbc5bdf9de3e, 79ee0b2189fb154e88fd0c68097b68ee2258d0e1
 Model Service: cc720660df1a5a40dec2fc9541a9ad9132e66958
 Lib: b5f494d90f73e4e56cc0eea1d8b0d27e815024aa
 
