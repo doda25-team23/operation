@@ -140,11 +140,15 @@ k8s-clean: ## Remove both Helm releases (app + monitoring)
 
 .PHONY: rate-limit-test
 rate-limit-test: ## Run the Envoy rate limiting smoke test script
-	./test-rate-limit.sh
+	@./test-rate-limit.sh
 
 .PHONY: validate-canary
 validate-canary: ## Validate canary deployment setup
-	./validate-canary-setup.sh $(K8S_NAMESPACE)
+	@./validate-canary-setup.sh $(K8S_NAMESPACE)
+
+.PHONY: run-experiment
+run-experiment: ## Run canary experiment with traffic generation
+	@./run-experiment.sh $(K8S_NAMESPACE) 300
 
 # -----------------------------------------------------------------------------
 # Vagrant + Ansible (cluster provisioning)

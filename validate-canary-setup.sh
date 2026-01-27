@@ -2,7 +2,7 @@
 # Validation script for Istio canary deployment setup
 # Usage: ./validate-canary-setup.sh [namespace]
 
-set -e
+set -euo pipefail
 
 NAMESPACE="${1:-sms-app}"
 ERRORS=0
