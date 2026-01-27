@@ -408,7 +408,7 @@ Prepared presentation materials and fixed critical deployment issues. Made small
 
 Diagnosed and fixed production deployment issue where model-service was returning 500 errors on all prediction requests. Through pod log inspection and direct endpoint testing, identified that preprocessor.joblib was missing from containers despite being available in GitHub releases. Root cause was that download_model.py only downloaded model.joblib and ignored the preprocessor. Fixed by updating download_model.py to download both files and modified text_preprocessing.py to check MODEL_DIR environment variable with fallback to output/ for local development. Temporarily copied preprocessor to running pods for immediate fix, then implemented permanent solution in model-service repository. Set up continuous traffic generation script for monitoring validation and verified full request path through Istio ingress gateway.
 
-PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26, https://github.com/doda25-team23/model-service/pull/[TBD]
+PRs: https://github.com/doda25-team23/operation/pull/24, https://github.com/doda25-team23/operation/pull/26, https://github.com/doda25-team23/model-service/pull/7, https://github.com/doda25-team23/operation/pull/29
 
 ### Radu
 
