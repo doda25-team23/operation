@@ -8,10 +8,36 @@ This guide helps you get the SMS Spam Detection system running quickly in differ
 - Kubernetes cluster with Istio (for production deployment)
 - Helm 3.x
 - kubectl configured
+- GitHub account with access to doda25-team23 organization (for private images)
+
+## Container Registry Authentication
+
+**Images are private.** Before running any deployment, you must authenticate.
+
+### Create a GitHub Personal Access Token (PAT)
+
+1. Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click "Generate new token (classic)"
+3. Select the `read:packages` scope
+4. Generate and copy the token (you won't see it again)
+
+### Authenticate Docker (for Docker Compose)
+
+```bash
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+# When prompted for password, paste your PAT
+```
+
+Verify authentication:
+```bash
+docker pull ghcr.io/doda25-team23/app:latest
+```
 
 ## Local Development (Docker Compose)
 
-Fastest way to run the application locally:
+Fastest way to run the application locally.
+
+**Prerequisite:** Complete the [Container Registry Authentication](#container-registry-authentication) step first.
 
 ```bash
 # Start the services
@@ -31,21 +57,22 @@ make compose-down
 ```
 
 The compose setup includes:
-- Frontend on port 8080
-- Model service on port 8081
+- Frontend on port 8080 (exposed to host)
+- Model service on port 8081 (internal only, not exposed to host)
 - Health checks enabled
 - Automatic restart on failure
+- Model downloaded automatically at runtime
 
 ### Verify Metrics (Optional)
 
 After starting the services, you can verify that custom application metrics are being exposed:
 
 ```bash
-# Frontend metrics
+# Frontend metrics (accessible from host)
 curl http://localhost:8080/actuator/prometheus | grep app_
 
-# Model service metrics
-curl http://localhost:8081/metrics | grep app_
+# Model service metrics (via docker exec, not exposed externally)
+docker exec sms-model-service curl -s http://localhost:8081/metrics | grep app_
 ```
 
 Expected custom metrics:
@@ -126,7 +153,7 @@ make rate-limit-test
 
 ### Docker Compose
 - Frontend: http://localhost:8080
-- Model Service API: http://localhost:8081/apidocs
+- Model Service: Internal only (not exposed to host for security)
 
 ### Kubernetes (with Ingress)
 - Frontend: http://app.sms-detector.local

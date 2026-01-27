@@ -32,6 +32,11 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
 ### Docker Compose (Local Development)
 
 ```bash
+# First, authenticate with GitHub Container Registry (one-time setup)
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+# Enter your GitHub PAT with read:packages scope when prompted
+
+# Start services
 make compose-up
 ```
 
@@ -54,9 +59,39 @@ make k8s-lint
 
 ## Container Images
 
-Published on GitHub Container Registry:
+Published on GitHub Container Registry (private):
 - Frontend: `ghcr.io/doda25-team23/app:latest`
 - Model Service: `ghcr.io/doda25-team23/model-service:latest`
+
+### Authentication (Required)
+
+Images are private. You must authenticate before pulling.
+
+**1. Create a GitHub Personal Access Token (PAT):**
+   - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Generate new token with `read:packages` scope
+   - Save the token securely
+
+**2. For Docker Compose (local development):**
+```bash
+# Login to GitHub Container Registry
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+# Enter your PAT when prompted for password
+
+# Verify login
+docker pull ghcr.io/doda25-team23/app:latest
+```
+
+**3. For Kubernetes:**
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_GITHUB_USERNAME \
+  --docker-password=YOUR_GITHUB_PAT \
+  -n sms-app
+```
+
+The Helm chart automatically references `ghcr-secret` for image pulls.
 
 ## Features
 
