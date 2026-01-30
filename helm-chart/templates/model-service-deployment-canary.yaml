@@ -1,21 +1,24 @@
+{{- if and .Values.istio.enabled .Values.canary.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sms-app.fullname" . }}-model-service
+  name: {{ include "sms-app.fullname" . }}-model-service-canary
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "sms-app.labels" . | nindent 4 }}
     app: {{ .Values.modelService.service.name }}
+    version: v2
 spec:
-  replicas: {{ .Values.modelService.replicaCount }}
+  replicas: {{ .Values.canary.modelService.replicaCount | default 1 }}
   selector:
     matchLabels:
       {{- include "sms-app.modelService.selectorLabels" . | nindent 6 }}
+      version: v2
   template:
     metadata:
       labels:
         {{- include "sms-app.modelService.selectorLabels" . | nindent 8 }}
-        version: {{ .Values.modelService.version | default "v1" }}
+        version: v2
     spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -23,7 +26,7 @@ spec:
       {{- end }}
       containers:
       - name: model-service
-        image: "{{ .Values.modelService.image.repository }}:{{ .Values.modelService.image.tag }}"
+        image: "{{ .Values.modelService.image.repository }}:{{ .Values.canary.modelService.image.tag }}"
         imagePullPolicy: {{ .Values.modelService.image.pullPolicy }}
         ports:
         - containerPort: {{ .Values.modelService.service.targetPort }}
@@ -48,7 +51,7 @@ spec:
         - name: MODEL_DIR
           value: {{ .Values.modelService.model.dir | default "/app/model" | quote }}
         - name: APP_VERSION
-          value: {{ .Values.modelService.version | default "v1" | quote }}
+          value: "v2"
         {{- if .Values.modelService.volume.enabled }}
         volumeMounts:
         - name: shared-storage
@@ -79,3 +82,4 @@ spec:
           path: {{ .Values.modelService.volume.hostPath }}
           type: DirectoryOrCreate
       {{- end }}
+{{- end }}

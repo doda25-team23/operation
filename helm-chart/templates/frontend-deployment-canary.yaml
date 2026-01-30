@@ -1,21 +1,24 @@
+{{- if and .Values.istio.enabled .Values.canary.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sms-app.fullname" . }}-frontend
+  name: {{ include "sms-app.fullname" . }}-frontend-canary
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "sms-app.labels" . | nindent 4 }}
     app: {{ .Values.frontend.service.name }}
+    version: v2
 spec:
-  replicas: {{ .Values.frontend.replicaCount }}
+  replicas: {{ .Values.canary.frontend.replicaCount | default 1 }}
   selector:
     matchLabels:
       {{- include "sms-app.frontend.selectorLabels" . | nindent 6 }}
+      version: v2
   template:
     metadata:
       labels:
         {{- include "sms-app.frontend.selectorLabels" . | nindent 8 }}
-        version: {{ .Values.frontend.version | default "v1" }}
+        version: v2
     spec:
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -23,7 +26,7 @@ spec:
       {{- end }}
       containers:
       - name: frontend
-        image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+        image: "{{ .Values.frontend.image.repository }}:{{ .Values.canary.frontend.image.tag }}"
         imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
         ports:
         - containerPort: {{ .Values.frontend.service.targetPort }}
@@ -33,7 +36,7 @@ spec:
         - name: MODEL_HOST
           value: {{ include "sms-app.modelServiceUrl" . | quote }}
         - name: APP_VERSION
-          value: {{ .Values.frontend.version | default "v1" | quote }}
+          value: "v2"
         envFrom:
         - configMapRef:
             name: {{ include "sms-app.fullname" . }}-config
@@ -55,3 +58,4 @@ spec:
           initialDelaySeconds: {{ .Values.frontend.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.frontend.readinessProbe.periodSeconds }}
         {{- end }}
+{{- end }}

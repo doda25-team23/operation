@@ -19,4 +19,8 @@ spec:
     - port: http
       path: {{ .Values.appMetrics.frontend.metricsPath }}
       interval: {{ .Values.monitoring.scrapeInterval }}
+      relabelings:
+        # Copy pod's version label to metrics
+        - sourceLabels: [__meta_kubernetes_pod_label_version]
+          targetLabel: version
 {{- end }}

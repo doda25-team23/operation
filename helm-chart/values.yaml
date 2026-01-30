@@ -175,6 +175,26 @@ config:
   # -- Example feature flag
   featureFlagExample: "true"
 
+# Canary deployment configuration (A4 - Continuous Experimentation)
+# When enabled, deploys both v1 (stable) and v2 (canary) versions simultaneously
+canary:
+  # -- Enable canary deployment (deploys both v1 and v2)
+  enabled: false
+
+  frontend:
+    # -- Canary (v2) replica count
+    replicaCount: 1
+    image:
+      # -- Canary image tag (must be different from stable)
+      tag: "v2"
+
+  modelService:
+    # -- Canary (v2) replica count
+    replicaCount: 1
+    image:
+      # -- Canary image tag
+      tag: "v2"
+
 # Rate limiting configuration (A4)
 rateLimit:
   # -- Enable rate limiting
