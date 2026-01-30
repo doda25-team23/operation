@@ -419,3 +419,17 @@ PRs:
 - https://github.com/doda25-team23/app/pull/3 
 - https://github.com/doda25-team23/model-service/pull/6
 
+--
+
+## Post deadline updates
+
+### Ocean
+
+We deployed canary infrastructure using Istio to route traffic between v1 and v2 versions with configurable weights. Two experiments (90/10 and 50/50 splits) confirmed correct traffic distribution via ingress gateway logs. Both versions showed identical latency, with v2 having 28% fewer errors—meeting all acceptance criteria for promotion.
+
+PR: 
+    https://github.com/doda25-team23/operation/pull/31
+Commits:
+    app: a3d60d6529d64b69a0f6b7c10f08c644fe8860e5
+    Model-service: 653a3a93c0501a7c6bf993dfc36e5064fa735d8a
+
