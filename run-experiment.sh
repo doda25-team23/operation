@@ -19,12 +19,13 @@ echo
 
 # Step 1: Validate deployment
 echo "[1/4] Validating deployment..."
-if ! ./validate-canary-setup.sh "$NAMESPACE" > /tmp/validation.log 2>&1; then
-    echo "Validation failed. Check /tmp/validation.log"
+./validate-canary-setup.sh "$NAMESPACE" > /tmp/validation.log 2>&1 || true
+if grep -q "\[ERROR\]" /tmp/validation.log; then
+    echo "Validation failed with errors. Check /tmp/validation.log"
     cat /tmp/validation.log
     exit 1
 fi
-echo "      Deployment validated"
+echo "      Deployment validated (warnings may exist)"
 echo
 
 # Step 2: Check traffic split configuration
@@ -39,8 +40,22 @@ fi
 echo
 
 # Step 3: Generate traffic and collect responses
-echo "[3/4] Generating traffic for ${DURATION}s..."
-echo "      (sending requests every 2 seconds)"
+echo "[3/4] Generating prediction traffic for ${DURATION}s..."
+echo "      (sending POST requests every 2 seconds)"
+
+# Sample SMS messages for testing (mix of ham and spam-like)
+SMS_MESSAGES=(
+    "Hey, are you free for lunch today?"
+    "CONGRATULATIONS! You won a FREE prize! Call now!"
+    "Meeting rescheduled to 3pm tomorrow"
+    "FREE entry in our weekly contest! Text WIN to 12345"
+    "Can you pick up milk on your way home?"
+    "URGENT: Your account has been compromised, click here"
+    "Happy birthday! Hope you have a great day"
+    "You have been selected for a cash prize! Claim now"
+    "Running late, be there in 10 minutes"
+    "Win a brand new iPhone! Reply YES to claim"
+)
 
 V1_COUNT=0
 V2_COUNT=0
@@ -49,29 +64,38 @@ TOTAL_COUNT=0
 START_TIME=$(date +%s)
 
 while [ $(($(date +%s) - START_TIME)) -lt "$DURATION" ]; do
-    RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 5 "$TARGET_URL" 2>/dev/null || echo -e "\n000")
+    # Pick a random SMS message
+    SMS="${SMS_MESSAGES[$((RANDOM % ${#SMS_MESSAGES[@]}))]}"
+
+    # Make POST request to trigger actual prediction
+    # Host header required for Istio VirtualService routing
+    RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 5 \
+        -X POST \
+        -H "Host: app.sms-detector.local" \
+        --data-urlencode "sms=$SMS" \
+        "${TARGET_URL}/sms/" 2>/dev/null || echo -e "\n000")
     HTTP_CODE=$(echo "$RESPONSE" | tail -1)
     BODY=$(echo "$RESPONSE" | head -n -1)
-    
-    ((TOTAL_COUNT++))
-    
+
+    TOTAL_COUNT=$((TOTAL_COUNT + 1))
+
     if [ "$HTTP_CODE" = "200" ]; then
         # Try to detect version from response if available
         if echo "$BODY" | grep -q "v2\|version.*2" 2>/dev/null; then
-            ((V2_COUNT++))
+            V2_COUNT=$((V2_COUNT + 1))
         else
-            ((V1_COUNT++))
+            V1_COUNT=$((V1_COUNT + 1))
         fi
     else
-        ((ERROR_COUNT++))
+        ERROR_COUNT=$((ERROR_COUNT + 1))
     fi
-    
+
     # Progress indicator every 30 requests
     if [ $((TOTAL_COUNT % 30)) -eq 0 ]; then
         ELAPSED=$(($(date +%s) - START_TIME))
-        echo "      ${ELAPSED}s elapsed - ${TOTAL_COUNT} requests sent"
+        echo "      ${ELAPSED}s elapsed - ${TOTAL_COUNT} requests sent (v1: $V1_COUNT, v2: $V2_COUNT, errors: $ERROR_COUNT)"
     fi
-    
+
     sleep 2
 done
 

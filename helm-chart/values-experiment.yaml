@@ -1,0 +1,129 @@
+# Experiment configuration: v1 stable + v2 canary (90/10 split)
+# This configuration deploys both versions simultaneously for A/B testing
+#
+# Usage:
+#   helm upgrade --install sms-app ./helm-chart -n sms-app --create-namespace -f ./helm-chart/values-experiment.yaml
+#
+# Verify deployment:
+#   kubectl get pods -n sms-app -L version
+#   Expected: Both v1 and v2 pods running
+
+namespace: sms-app
+
+# Stable (v1) frontend configuration
+frontend:
+  replicaCount: 2
+  version: v1
+  image:
+    repository: ghcr.io/doda25-team23/app
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# Stable (v1) model service configuration
+modelService:
+  replicaCount: 2
+  version: v1
+  image:
+    repository: ghcr.io/doda25-team23/model-service
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Model download from GitHub releases (F10)
+  model:
+    version: "model-20251121-193920"
+    baseUrl: "https://github.com/doda25-team23/model-service/releases/download"
+    dir: "/app/model"
+    secretName: "github-token"
+  volume:
+    enabled: false
+
+# Enable canary deployment - THIS IS THE KEY SETTING
+# When enabled, deploys v2 versions alongside v1
+canary:
+  enabled: true
+  frontend:
+    replicaCount: 1
+    image:
+      tag: "v2"
+  modelService:
+    replicaCount: 1
+    image:
+      tag: "v2"
+
+# Istio traffic management configuration
+istio:
+  enabled: true
+
+  # IngressGateway selector (adjust based on your Istio installation)
+  ingressGateway:
+    name: ingressgateway
+
+  # Gateway hostnames
+  hosts:
+    stable: app.sms-detector.local
+    canary: canary.sms-detector.local
+
+  # Traffic split configuration (must sum to 100)
+  trafficSplit:
+    stable: 90   # 90% to v1 (stable)
+    canary: 10   # 10% to v2 (canary)
+
+  # Sticky sessions ensure users stay on same version
+  stickySession:
+    useCookie: true
+    cookieName: sms-app-version
+    cookieTTL: 3600s
+    headerName: x-user-id
+
+# Rate limiting (enabled for protection)
+rateLimit:
+  enabled: true
+  maxTokens: 10
+  tokensPerFill: 10
+  fillInterval: "60s"
+  scope: sidecar
+
+# =============================================================================
+# EXPERIMENT WORKFLOW
+# =============================================================================
+#
+# 1. Deploy with this config:
+#    helm upgrade --install sms-app ./helm-chart -n sms-app -f ./helm-chart/values-experiment.yaml
+#
+# 2. Verify both versions running:
+#    kubectl get pods -n sms-app -L version
+#
+# 3. Test routing:
+#    # Should route based on 90/10 split
+#    curl http://app.sms-detector.local/sms/
+#
+#    # Force v1:
+#    curl -H "x-version: v1" http://app.sms-detector.local/sms/
+#
+#    # Force v2:
+#    curl -H "x-version: v2" http://app.sms-detector.local/sms/
+#
+# 4. Generate traffic:
+#    ./run-experiment.sh sms-app 300 http://app.sms-detector.local
+#
+# 5. View in Grafana:
+#    kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+#    # Query: sum by (version) (rate(app_predictions_total[1m]))
+#
+# 6. Adjust traffic split:
+#    # Increase to 50/50
+#    helm upgrade sms-app ./helm-chart -n sms-app \
+#      --set istio.trafficSplit.stable=50 \
+#      --set istio.trafficSplit.canary=50 \
+#      --reuse-values
+#
+#    # Promote to 100% v2
+#    helm upgrade sms-app ./helm-chart -n sms-app \
+#      --set istio.trafficSplit.stable=0 \
+#      --set istio.trafficSplit.canary=100 \
+#      --reuse-values
+#
+#    # Rollback to 100% v1
+#    helm upgrade sms-app ./helm-chart -n sms-app \
+#      --set istio.trafficSplit.stable=100 \
+#      --set istio.trafficSplit.canary=0 \
+#      --reuse-values
